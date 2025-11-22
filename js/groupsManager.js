@@ -134,6 +134,10 @@ class GroupsManager {
         return false;
     }
 
+    getGroup(groupId) {
+        return this.groups.find(g => g.id === groupId);
+    }
+
     moveToTrash(type, item) {
         const trashItem = {
             ...item,
@@ -198,12 +202,8 @@ class GroupsManager {
         this.saveTrash();
     }
 
-    getGroupById(groupId) {
-        return this.groups.find(g => g.id === groupId);
-    }
-
     updateSessionCount(groupId, sessionManager) {
-        const group = this.getGroupById(groupId);
+        const group = this.getGroup(groupId);
         if (group) {
             const sessions = sessionManager.getSessionsBySchool(group.schoolName);
             group.sessionCount = sessions.length;
@@ -230,19 +230,21 @@ class GroupsManager {
         );
     }
 
-    renderGroupsList(container, onGroupEdit, onGroupDelete, onGroupView = null) {
+    renderGroupsList(container, onGroupView, onGroupEdit, onGroupDelete) {
         console.log('Rendering groups list:', this.groups.length, 'groups');
         
         container.innerHTML = '';
         
         if (this.groups.length === 0) {
-            document.getElementById('emptyGroupsState').style.display = 'block';
+            const emptyState = document.getElementById('emptyGroupsState');
+            if (emptyState) emptyState.style.display = 'block';
             container.style.display = 'none';
             return;
         }
         
-        document.getElementById('emptyGroupsState').style.display = 'none';
-        container.style.display = 'block';
+        const emptyState = document.getElementById('emptyGroupsState');
+        if (emptyState) emptyState.style.display = 'none';
+        container.style.display = 'grid';
 
         // Sort groups alphabetically by school name, then by campus
         const sortedGroups = this.groups.sort((a, b) => {
@@ -254,12 +256,12 @@ class GroupsManager {
         });
 
         sortedGroups.forEach(group => {
-            const groupElement = this.createGroupElement(group, onGroupEdit, onGroupDelete, onGroupView);
+            const groupElement = this.createGroupElement(group, onGroupView, onGroupEdit, onGroupDelete);
             container.appendChild(groupElement);
         });
     }
 
-    createGroupElement(group, onGroupEdit, onGroupDelete, onGroupView = null) {
+    createGroupElement(group, onGroupView, onGroupEdit, onGroupDelete) {
         const swipeContainer = document.createElement('div');
         swipeContainer.className = 'swipe-container';
         swipeContainer.dataset.id = group.id;
@@ -413,24 +415,40 @@ class GroupsManager {
 
         // Render deleted sessions
         sessionsContainer.innerHTML = '';
-        trashSessions.forEach(item => {
-            const trashElement = this.createTrashElement(item, onRestore, onPermanentDelete);
-            sessionsContainer.appendChild(trashElement);
-        });
+        if (trashSessions.length > 0) {
+            const sessionsHeader = document.createElement('h4');
+            sessionsHeader.textContent = 'Deleted Observations';
+            sessionsHeader.style.marginBottom = 'var(--space-3)';
+            sessionsHeader.style.color = 'var(--text-secondary)';
+            sessionsContainer.appendChild(sessionsHeader);
+            
+            trashSessions.forEach(item => {
+                const trashElement = this.createTrashElement(item, onRestore, onPermanentDelete);
+                sessionsContainer.appendChild(trashElement);
+            });
+        }
 
         // Render deleted groups
         groupsContainer.innerHTML = '';
-        trashGroups.forEach(item => {
-            const trashElement = this.createTrashElement(item, onRestore, onPermanentDelete);
-            groupsContainer.appendChild(trashElement);
-        });
+        if (trashGroups.length > 0) {
+            const groupsHeader = document.createElement('h4');
+            groupsHeader.textContent = 'Deleted School Groups';
+            groupsHeader.style.marginBottom = 'var(--space-3)';
+            groupsHeader.style.color = 'var(--text-secondary)';
+            groupsContainer.appendChild(groupsHeader);
+            
+            trashGroups.forEach(item => {
+                const trashElement = this.createTrashElement(item, onRestore, onPermanentDelete);
+                groupsContainer.appendChild(trashElement);
+            });
+        }
 
         // Show/hide empty state
         const emptyState = document.getElementById('emptyTrashState');
         if (this.trash.length === 0) {
-            emptyState.style.display = 'block';
+            if (emptyState) emptyState.style.display = 'block';
         } else {
-            emptyState.style.display = 'none';
+            if (emptyState) emptyState.style.display = 'none';
         }
     }
 
@@ -472,7 +490,7 @@ class GroupsManager {
             restoreBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 console.log('Restore button clicked for trashId:', item.trashId);
-                onRestore(item.trashId);
+                onRestore(item.trashId, item.originalType);
             });
         }
         
@@ -480,11 +498,28 @@ class GroupsManager {
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 console.log('Delete button clicked for trashId:', item.trashId);
-                onPermanentDelete(item.trashId);
+                onPermanentDelete(item.trashId, item.originalType);
             });
         }
 
         return element;
+    }
+
+    renderGroupSessions(container, groupId, onSessionSelect, onSessionEdit, onSessionDelete) {
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        const group = this.getGroup(groupId);
+        if (!group) return;
+        
+        // For now, we'll show a message. In a real app, you'd filter sessions by group
+        container.innerHTML = `
+            <div class="empty-state">
+                <h3>No observations for this group yet</h3>
+                <p>Create the first observation for ${group.schoolName}</p>
+            </div>
+        `;
     }
 
     // Improved method to get schools for dropdown
