@@ -325,6 +325,15 @@ class DrawingCanvas {
         }
     }
 
+    // NEW: Add text comment to canvas
+    addCommentToCanvas(commentText, x = 50, y = 50) {
+        this.ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        this.ctx.fillStyle = this.currentColor;
+        this.ctx.fillText(commentText, x, y);
+        this.saveDrawing();
+        console.log('Comment added to canvas:', commentText);
+    }
+
     // New method to export drawing as image
     exportDrawing() {
         return this.canvas.toDataURL('image/png');
@@ -391,13 +400,5 @@ class DrawingCanvas {
         if (this.currentIndicatorId && this.onSaveCallback) {
             this.onSaveCallback(this.currentIndicatorId, null, this.currentPerformanceType);
         }
-    }
-
-    // New method to add text comment to canvas
-    addCommentToCanvas(commentText, x = 50, y = 50) {
-        this.ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-        this.ctx.fillStyle = this.currentColor;
-        this.ctx.fillText(commentText, x, y);
-        this.saveDrawing();
     }
 }

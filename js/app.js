@@ -7,11 +7,11 @@ class App {
         
         // Make groupsManager globally available for sessionManager
         window.groupsManager = this.groupsManager;
+        window.app = this; // Global reference for indicators
         
         // New state variables
         this.isSidebarCollapsed = false;
-        this.performanceViewMode = 'good'; // 'good' or 'growth'
-        this.isCommentsOpen = false;
+        this.globalFilterMode = 'all'; // 'all', 'good', 'growth'
         this.currentFilters = {};
         this.confirmedAction = null;
         this.confirmedActionData = null;
@@ -23,7 +23,6 @@ class App {
         // Set up drawing save callback
         this.drawingCanvas.setOnSaveCallback((indicatorId, drawingData, performanceType) => {
             this.sessionManager.saveIndicatorNotes(indicatorId, drawingData, performanceType);
-            this.indicatorsManager.markIndicatorAsHavingNotes(indicatorId, performanceType);
             this.updateProgress();
             this.updateIndicatorPerformanceDisplay();
         });
@@ -203,13 +202,8 @@ class App {
             });
         }
 
-        // Group view events
-        const backToGroups = document.getElementById('backToGroups');
-        if (backToGroups) {
-            backToGroups.addEventListener('click', () => {
-                this.showGroupsTab();
-            });
-        }
+        // Group view events - FIX: Setup back button properly
+        this.setupGroupViewBackButton();
         
         const newSessionForGroup = document.getElementById('newSessionForGroup');
         if (newSessionForGroup) {
@@ -233,24 +227,12 @@ class App {
             });
         }
 
-        const performanceToggle = document.getElementById('performanceToggle');
-        if (performanceToggle) {
-            performanceToggle.addEventListener('click', () => {
-                this.togglePerformanceView();
-            });
-        }
-
-        const toggleComments = document.getElementById('toggleComments');
-        if (toggleComments) {
-            toggleComments.addEventListener('click', () => {
-                this.toggleCommentsPalette();
-            });
-        }
-
-        const closeComments = document.getElementById('closeComments');
-        if (closeComments) {
-            closeComments.addEventListener('click', () => {
-                this.hideCommentsPalette();
+        // Global filter toggle
+        const globalFilter = document.getElementById('globalFilter');
+        if (globalFilter) {
+            globalFilter.addEventListener('change', (e) => {
+                this.globalFilterMode = e.target.value;
+                this.applyGlobalFilter();
             });
         }
 
@@ -276,6 +258,28 @@ class App {
 
         // Search functionality
         this.setupSearchFunctionality();
+    }
+
+    // FIX 1: Back button in group view
+    setupGroupViewBackButton() {
+        // Group view events - FIX: Proper back button binding
+        this.setupGroupViewBackButton();
+    }
+
+    // FIX 1: Back button in group view
+    setupGroupViewBackButton() {
+        const backToGroups = document.getElementById('backToGroups');
+        if (backToGroups) {
+            // Remove any existing event listeners
+            const newBackButton = backToGroups.cloneNode(true);
+            backToGroups.parentNode.replaceChild(newBackButton, backToGroups);
+            
+            // Add new event listener
+            document.getElementById('backToGroups').addEventListener('click', () => {
+                console.log('Back to groups clicked - working!');
+                this.showGroupsTab();
+            });
+        }
     }
 
     setupSearchFunctionality() {
@@ -505,6 +509,9 @@ class App {
         // Set default date to today
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('date').value = today;
+        
+        // Populate school dropdown
+        this.populateSchoolDropdowns();
     }
 
     hideNewSessionModal() {
@@ -513,15 +520,31 @@ class App {
 
     createNewSession() {
         const form = document.getElementById('newSessionForm');
-        const formData = new FormData(form);
+        
+        const formData = {
+            school: document.getElementById('schoolSelect').value,
+            campus: document.getElementById('campus').value,
+            teacher: document.getElementById('teacher').value.trim(),
+            date: document.getElementById('date').value,
+            unit: parseInt(document.getElementById('unit').value) || 1,
+            lesson: parseInt(document.getElementById('lesson').value) || 1
+        };
+        
+        // Validate required fields
+        if (!formData.school || !formData.teacher || !formData.date) {
+            this.showNotification('Please fill in all required fields', 'error');
+            return;
+        }
+        
+        console.log('Creating session with data:', formData);
         
         const session = this.sessionManager.createSession(
-            formData.get('school'),
-            formData.get('campus'),
-            formData.get('teacher'),
-            formData.get('date'),
-            formData.get('unit'),
-            formData.get('lesson')
+            formData.school,
+            formData.campus,
+            formData.teacher,
+            formData.date,
+            formData.unit,
+            formData.lesson
         );
         
         if (session) {
@@ -531,21 +554,36 @@ class App {
         }
     }
 
+    // FIX 4: Campus dropdown in edit observation
+    // FIX 4: Campus dropdown in edit observation
     editSession(sessionId) {
         const session = this.sessionManager.getSessionForEdit(sessionId);
         if (session) {
             this.editingSessionId = sessionId;
             
-            // Populate form
-            document.getElementById('editSchoolSelect').value = session.school;
-            document.getElementById('editCampus').value = session.campus || '';
-            document.getElementById('editTeacher').value = session.teacher;
-            document.getElementById('editDate').value = session.date;
-            document.getElementById('editUnit').value = session.unit;
-            document.getElementById('editLesson').value = session.lesson;
+            // Populate school dropdowns first
+            this.populateSchoolDropdowns();
             
-            // Update campus options based on school
-            this.handleSchoolSelection('editSchoolSelect', session.school);
+            // Set form values
+            document.getElementById('editSchoolSelect').value = session.school || '';
+            document.getElementById('editTeacher').value = session.teacher || '';
+            document.getElementById('editDate').value = session.date || '';
+            document.getElementById('editUnit').value = session.unit || '';
+            document.getElementById('editLesson').value = session.lesson || '';
+            
+            // FIX: Force campus dropdown to populate and set value
+            setTimeout(() => {
+                // Trigger campus dropdown population
+                this.handleSchoolSelection('editSchoolSelect', session.school);
+                
+                // Set campus value after a short delay to ensure dropdown is populated
+                setTimeout(() => {
+                    const campusSelect = document.getElementById('editCampus');
+                    if (campusSelect) {
+                        campusSelect.value = session.campus || '';
+                    }
+                }, 100);
+            }, 150);
             
             document.getElementById('editSessionModal').style.display = 'flex';
         }
@@ -553,16 +591,23 @@ class App {
 
     updateSession(sessionId) {
         const form = document.getElementById('editSessionForm');
-        const formData = new FormData(form);
         
         const updates = {
-            school: formData.get('school'),
-            campus: formData.get('campus'),
-            teacher: formData.get('teacher'),
-            date: formData.get('date'),
-            unit: parseInt(formData.get('unit')),
-            lesson: parseInt(formData.get('lesson'))
+            school: document.getElementById('editSchoolSelect').value,
+            campus: document.getElementById('editCampus').value,
+            teacher: document.getElementById('editTeacher').value.trim(),
+            date: document.getElementById('editDate').value,
+            unit: parseInt(document.getElementById('editUnit').value) || 1,
+            lesson: parseInt(document.getElementById('editLesson').value) || 1
         };
+        
+        // Validate required fields
+        if (!updates.school || !updates.teacher || !updates.date) {
+            this.showNotification('Please fill in all required fields', 'error');
+            return;
+        }
+        
+        console.log('Updating session with data:', updates);
         
         const updatedSession = this.sessionManager.updateSession(sessionId, updates);
         if (updatedSession) {
@@ -683,25 +728,47 @@ class App {
         }
     }
 
+    showGroupView(groupId) {
+        const group = this.groupsManager.getGroup(groupId);
+        if (group) {
+            this.currentGroupId = groupId;
+            
+            // Update group view header
+            document.getElementById('groupViewTitle').textContent = group.schoolName;
+            document.getElementById('groupViewSubtitle').textContent = 
+                `${group.schoolName}${group.campus ? ` • ${group.campus}` : ''}`;
+            
+            // FIX: Setup back button
+            this.setupGroupViewBackButton();
+            
+            // Load group sessions
+            this.groupsManager.renderGroupSessions(
+                document.getElementById('groupSessionsContainer'),
+                groupId,
+                (sessionId) => this.loadSession(sessionId),
+                (sessionId) => this.editSession(sessionId),
+                (sessionId) => this.deleteSession(sessionId)
+            );
+            
+            // Show group view
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('groupView').style.display = 'block';
+            document.getElementById('noteApp').style.display = 'none';
+        }
+    }
+
     // School Selection Handler
     handleSchoolSelection(selectId, schoolName) {
-        // This would typically fetch campuses from a database
-        // For now, we'll use a simple mapping
-        const campusMappings = {
-            'School A': ['Main Campus', 'North Campus'],
-            'School B': ['Central Campus', 'West Campus'],
-            'School C': ['Primary Campus']
-        };
-        
         const campusSelect = selectId === 'schoolSelect' ? 
             document.getElementById('campus') : 
             document.getElementById('editCampus');
             
-        if (campusSelect) {
+        if (campusSelect && schoolName) {
             const currentValue = campusSelect.value;
             campusSelect.innerHTML = '<option value="">Select Campus</option>';
             
-            const campuses = campusMappings[schoolName] || [];
+            // Get campuses from groupsManager
+            const campuses = this.groupsManager.getCampusesForSchool(schoolName);
             campuses.forEach(campus => {
                 const option = document.createElement('option');
                 option.value = campus;
@@ -714,6 +781,61 @@ class App {
                 campusSelect.value = currentValue;
             }
         }
+    }
+
+    // Populate school dropdowns
+    populateSchoolDropdowns() {
+        const schools = this.groupsManager.getSchoolsForDropdown();
+        const schoolSelects = [
+            document.getElementById('schoolSelect'),
+            document.getElementById('editSchoolSelect'),
+            document.getElementById('filterSchool')
+        ];
+        
+        schoolSelects.forEach(select => {
+            if (select) {
+                // Clear existing options except the first one
+                const firstOption = select.options[0];
+                select.innerHTML = '';
+                if (firstOption) select.appendChild(firstOption);
+                
+                // Add schools from groupsManager
+                Object.keys(schools).sort().forEach(school => {
+                    const option = document.createElement('option');
+                    option.value = school;
+                    option.textContent = school;
+                    select.appendChild(option);
+                });
+            }
+        });
+    }
+
+    // Global Filter System
+    applyGlobalFilter() {
+        const indicators = document.querySelectorAll('.indicator-item');
+        let visibleCount = 0;
+        
+        indicators.forEach(indicator => {
+            const indicatorId = indicator.dataset.id;
+            const notes = this.sessionManager.getIndicatorNotes(indicatorId);
+            
+            switch (this.globalFilterMode) {
+                case 'all':
+                    indicator.style.display = 'block';
+                    visibleCount++;
+                    break;
+                case 'good':
+                    const showGood = notes && notes.performanceType === 'good';
+                    indicator.style.display = showGood ? 'block' : 'none';
+                    if (showGood) visibleCount++;
+                    break;
+                case 'growth':
+                    const showGrowth = notes && notes.performanceType === 'growth';
+                    indicator.style.display = showGrowth ? 'block' : 'none';
+                    if (showGrowth) visibleCount++;
+                    break;
+            }
+        });
     }
 
     // Confirmation Modal
@@ -778,32 +900,21 @@ class App {
                 collapseIcon.textContent = '▶';
             }
             collapseBtn.setAttribute('title', 'Expand sidebar');
+            // FIX: Ensure collapse button remains visible
+            collapseBtn.style.display = 'flex';
         } else {
             sidebar.classList.remove('collapsed');
             if (collapseIcon) {
                 collapseIcon.textContent = '◀';
             }
             collapseBtn.setAttribute('title', 'Collapse sidebar');
+            collapseBtn.style.display = 'flex';
         }
         
         // Redraw canvas to adjust to new layout
         setTimeout(() => {
             this.drawingCanvas.resizeCanvas();
         }, 300);
-    }
-
-    togglePerformanceView() {
-        const toggle = document.getElementById('performanceToggle');
-        if (!toggle) return;
-        
-        this.performanceViewMode = this.performanceViewMode === 'good' ? 'growth' : 'good';
-        
-        toggle.classList.toggle('active', this.performanceViewMode === 'growth');
-        
-        // Update all indicator displays
-        this.updateIndicatorPerformanceDisplay();
-        
-        this.showNotification(`Now viewing: ${this.performanceViewMode === 'good' ? 'Good Points' : 'Growth Areas'}`);
     }
 
     updateIndicatorPerformanceDisplay() {
@@ -813,9 +924,9 @@ class App {
             const notes = this.sessionManager.getIndicatorNotes(indicatorId);
             
             // Remove existing performance classes
-            indicator.classList.remove('good-point', 'growth-area', 'has-notes');
+            indicator.classList.remove('good-point', 'growth-area', 'has-notes', 'active');
             
-            if (notes) {
+            if (notes && notes.performanceType) {
                 indicator.classList.add('has-notes');
                 if (notes.performanceType === 'good') {
                     indicator.classList.add('good-point');
@@ -827,13 +938,16 @@ class App {
             // Update performance badge
             this.updatePerformanceBadge(indicator, indicatorId);
         });
+        
+        // Apply global filter after update
+        this.applyGlobalFilter();
     }
 
     updatePerformanceBadge(indicatorElement, indicatorId) {
         let badge = indicatorElement.querySelector('.performance-badge');
         const notes = this.sessionManager.getIndicatorNotes(indicatorId);
         
-        if (notes) {
+        if (notes && notes.performanceType) {
             if (!badge) {
                 badge = document.createElement('div');
                 badge.className = 'performance-badge';
@@ -847,70 +961,6 @@ class App {
         } else if (badge) {
             badge.style.display = 'none';
         }
-    }
-
-    toggleCommentsPalette() {
-        const palette = document.getElementById('commentsPalette');
-        if (!palette) return;
-        
-        this.isCommentsOpen = !this.isCommentsOpen;
-        
-        if (this.isCommentsOpen) {
-            palette.classList.add('open');
-            this.loadCommentsForCurrentIndicator();
-        } else {
-            palette.classList.remove('open');
-        }
-    }
-
-    hideCommentsPalette() {
-        const palette = document.getElementById('commentsPalette');
-        if (palette) {
-            palette.classList.remove('open');
-            this.isCommentsOpen = false;
-        }
-    }
-
-    loadCommentsForCurrentIndicator() {
-        const commentsList = document.getElementById('commentsList');
-        const currentIndicatorId = this.drawingCanvas.currentIndicatorId;
-        
-        if (!commentsList) return;
-        
-        if (!currentIndicatorId) {
-            commentsList.innerHTML = '<div class="comment-item">Select an indicator first</div>';
-            return;
-        }
-        
-        const comments = this.indicatorsManager.getCommentsForIndicator(currentIndicatorId);
-        commentsList.innerHTML = '';
-        
-        if (comments.length === 0) {
-            commentsList.innerHTML = '<div class="comment-item">No comments available for this indicator</div>';
-            return;
-        }
-        
-        comments.forEach(comment => {
-            const commentElement = document.createElement('div');
-            commentElement.className = 'comment-item';
-            commentElement.innerHTML = `
-                <div class="comment-category">${comment.category}</div>
-                <div class="comment-text">${comment.text}</div>
-            `;
-            
-            commentElement.addEventListener('click', () => {
-                this.addCommentToCanvas(comment.text);
-            });
-            
-            commentsList.appendChild(commentElement);
-        });
-    }
-
-    addCommentToCanvas(commentText) {
-        // This would integrate with the drawing canvas to add text
-        // For now, we'll show a notification
-        this.showNotification(`Comment added: "${commentText}"`);
-        console.log('Adding comment to canvas:', commentText);
     }
 
     // Filter System
@@ -929,20 +979,11 @@ class App {
     }
 
     populateFilterOptions() {
+        // Populate school dropdowns
+        this.populateSchoolDropdowns();
+        
         const filterOptions = this.sessionManager.getFilterOptions();
         
-        // Populate school filter
-        const schoolSelect = document.getElementById('filterSchool');
-        if (schoolSelect) {
-            schoolSelect.innerHTML = '<option value="all">All Schools</option>';
-            filterOptions.schools.forEach(school => {
-                const option = document.createElement('option');
-                option.value = school;
-                option.textContent = school;
-                schoolSelect.appendChild(option);
-            });
-        }
-
         // Populate campus filter
         const campusSelect = document.getElementById('filterCampus');
         if (campusSelect) {
@@ -1107,32 +1148,6 @@ class App {
         this.updateCounts();
     }
 
-    showGroupView(groupId) {
-        const group = this.groupsManager.getGroup(groupId);
-        if (group) {
-            this.currentGroupId = groupId;
-            
-            // Update group view header
-            document.getElementById('groupViewTitle').textContent = group.schoolName;
-            document.getElementById('groupViewSubtitle').textContent = 
-                `${group.schoolName}${group.campus ? ` • ${group.campus}` : ''}`;
-            
-            // Load group sessions
-            this.groupsManager.renderGroupSessions(
-                document.getElementById('groupSessionsContainer'),
-                groupId,
-                (sessionId) => this.loadSession(sessionId),
-                (sessionId) => this.editSession(sessionId),
-                (sessionId) => this.deleteSession(sessionId)
-            );
-            
-            // Show group view
-            document.getElementById('dashboard').style.display = 'none';
-            document.getElementById('groupView').style.display = 'block';
-            document.getElementById('noteApp').style.display = 'none';
-        }
-    }
-
     // Search Functionality
     searchSessions(query) {
         const container = document.getElementById('sessionsContainer');
@@ -1247,16 +1262,18 @@ class App {
         }
     }
 
-    // Enhanced indicator selection
+    // FIX 2: Indicator selection - No automatic performance marking or coloring
+    // FIX 2: Indicator selection - No automatic coloring
     selectIndicator(indicator) {
         console.log('Selecting indicator:', indicator.id);
         
+        // Just set active indicator, no coloring
         this.indicatorsManager.setActiveIndicator(indicator.id);
         
-        // Load existing drawing with performance type
+        // Load existing drawing
         const existingNotes = this.sessionManager.getIndicatorNotes(indicator.id);
         
-        // Set current indicator with performance type
+        // Set current indicator
         this.drawingCanvas.setCurrentIndicator(indicator.id, indicator, existingNotes?.performanceType);
         
         // Update UI
@@ -1270,8 +1287,8 @@ class App {
             currentIndicatorDesc.textContent = indicator.explanation;
         }
         
-        // Load the drawing data
-        if (existingNotes) {
+        // Load drawing data if exists
+        if (existingNotes && existingNotes.drawingData) {
             setTimeout(() => {
                 this.drawingCanvas.loadDrawing(existingNotes.drawingData);
                 this.hideCanvasOverlay();
@@ -1280,9 +1297,6 @@ class App {
             this.drawingCanvas.clearCanvas();
             this.hideCanvasOverlay();
         }
-        
-        // Close comments palette when switching indicators
-        this.hideCommentsPalette();
         
         this.updateStatus(`Selected: ${indicator.indicator}`);
     }

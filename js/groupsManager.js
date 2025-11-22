@@ -230,6 +230,7 @@ class GroupsManager {
         );
     }
 
+    // FIXED: Ensure groups list renders properly
     renderGroupsList(container, onGroupView, onGroupEdit, onGroupDelete) {
         console.log('Rendering groups list:', this.groups.length, 'groups');
         

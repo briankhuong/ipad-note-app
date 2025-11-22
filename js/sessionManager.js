@@ -9,18 +9,19 @@ class SessionManager {
         
         this.currentSession = {
             id: sessionId,
-            school: school,
+            school: school || '',
             campus: campus || '',
-            teacher: teacher,
-            date: date,
-            unit: parseInt(unit),
-            lesson: parseInt(lesson),
+            teacher: teacher || '',
+            date: date || new Date().toISOString().split('T')[0],
+            unit: parseInt(unit) || 1,
+            lesson: parseInt(lesson) || 1,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             indicators: {},
             status: 'draft'
         };
         
+        console.log('Creating session:', this.currentSession);
         this.saveCurrentSession();
         return this.currentSession;
     }
@@ -39,18 +40,21 @@ class SessionManager {
         }
         
         this.saveSessions();
+        console.log('Session saved:', this.currentSession);
     }
 
-    saveIndicatorNotes(indicatorId, drawingData, performanceType = 'good') {
+    saveIndicatorNotes(indicatorId, drawingData, performanceType = null, autoComment = false) {
         if (!this.currentSession) return;
         
         this.currentSession.indicators[indicatorId] = {
             drawingData: drawingData,
             performanceType: performanceType,
+            autoComment: autoComment,
             savedAt: new Date().toISOString()
         };
         
         this.saveCurrentSession();
+        console.log(`Notes saved for ${indicatorId}:`, this.currentSession.indicators[indicatorId]);
     }
 
     getIndicatorNotes(indicatorId) {
@@ -64,6 +68,7 @@ class SessionManager {
         const session = this.sessions.find(s => s.id === sessionId);
         if (session) {
             this.currentSession = session;
+            console.log('Session loaded:', session);
             return session;
         }
         return null;
@@ -92,18 +97,26 @@ class SessionManager {
     updateSession(sessionId, updates) {
         const sessionIndex = this.sessions.findIndex(s => s.id === sessionId);
         if (sessionIndex >= 0) {
-            this.sessions[sessionIndex] = {
+            const updatedSession = {
                 ...this.sessions[sessionIndex],
-                ...updates,
+                school: updates.school || '',
+                campus: updates.campus || '',
+                teacher: updates.teacher || '',
+                date: updates.date || new Date().toISOString().split('T')[0],
+                unit: parseInt(updates.unit) || 1,
+                lesson: parseInt(updates.lesson) || 1,
                 updatedAt: new Date().toISOString()
             };
             
+            this.sessions[sessionIndex] = updatedSession;
+            
             if (this.currentSession && this.currentSession.id === sessionId) {
-                this.currentSession = this.sessions[sessionIndex];
+                this.currentSession = updatedSession;
             }
             
             this.saveSessions();
-            return this.sessions[sessionIndex];
+            console.log('Session updated:', updatedSession);
+            return updatedSession;
         }
         return null;
     }
@@ -126,95 +139,110 @@ class SessionManager {
         return sessionData;
     }
 
-    // Enhanced filtering methods
-    filterSessions(filters = {}) {
-        let filteredSessions = [...this.sessions];
+    // FIX 5: Observation filters - Fixed filtering logic
+    // FIX 5: Observation filters - Fixed logic
+filterSessions(filters = {}) {
+    console.log('🔍 Applying filters:', filters);
+    let filteredSessions = [...this.sessions];
 
-        // School filter
-        if (filters.school && filters.school !== 'all') {
-            filteredSessions = filteredSessions.filter(session => 
-                session.school === filters.school
-            );
-        }
-
-        // Campus filter
-        if (filters.campus && filters.campus !== 'all') {
-            filteredSessions = filteredSessions.filter(session => 
-                session.campus === filters.campus
-            );
-        }
-
-        // Date range filter
-        if (filters.startDate) {
-            const startDate = new Date(filters.startDate);
-            filteredSessions = filteredSessions.filter(session => 
-                new Date(session.createdAt) >= startDate
-            );
-        }
-
-        if (filters.endDate) {
-            const endDate = new Date(filters.endDate);
-            endDate.setHours(23, 59, 59, 999); // End of day
-            filteredSessions = filteredSessions.filter(session => 
-                new Date(session.createdAt) <= endDate
-            );
-        }
-
-        // Status filter
-        if (filters.status && filters.status !== 'all') {
-            filteredSessions = filteredSessions.filter(session => 
-                session.status === filters.status
-            );
-        }
-
-        // Progress filter
-        if (filters.progress && filters.progress !== 'all') {
-            filteredSessions = filteredSessions.filter(session => {
-                const progress = this.getSessionProgress(session.id);
-                if (filters.progress === 'complete') return progress === 100;
-                if (filters.progress === 'in-progress') return progress > 0 && progress < 100;
-                if (filters.progress === 'not-started') return progress === 0;
-                return true;
-            });
-        }
-
-        // Sort by specified field
-        if (filters.sortBy) {
-            filteredSessions.sort((a, b) => {
-                let aValue, bValue;
-                
-                switch (filters.sortBy) {
-                    case 'date':
-                        aValue = new Date(a.createdAt);
-                        bValue = new Date(b.createdAt);
-                        break;
-                    case 'teacher':
-                        aValue = a.teacher.toLowerCase();
-                        bValue = b.teacher.toLowerCase();
-                        break;
-                    case 'school':
-                        aValue = a.school.toLowerCase();
-                        bValue = b.school.toLowerCase();
-                        break;
-                    case 'progress':
-                        aValue = this.getSessionProgress(a.id);
-                        bValue = this.getSessionProgress(b.id);
-                        break;
-                    default:
-                        aValue = new Date(a.createdAt);
-                        bValue = new Date(b.createdAt);
-                }
-                
-                if (filters.sortOrder === 'asc') {
-                    return aValue > bValue ? 1 : -1;
-                } else {
-                    return aValue < bValue ? 1 : -1;
-                }
-            });
-        }
-
-        return filteredSessions;
+    // School filter
+    if (filters.school && filters.school !== 'all') {
+        filteredSessions = filteredSessions.filter(session => 
+            session.school === filters.school
+        );
+        console.log(`🏫 After school filter: ${filteredSessions.length} sessions`);
     }
+
+    // Campus filter  
+    if (filters.campus && filters.campus !== 'all') {
+        filteredSessions = filteredSessions.filter(session => 
+            session.campus === filters.campus
+        );
+        console.log(`📍 After campus filter: ${filteredSessions.length} sessions`);
+    }
+
+    // Status filter
+    if (filters.status && filters.status !== 'all') {
+        filteredSessions = filteredSessions.filter(session => 
+            session.status === filters.status
+        );
+        console.log(`📊 After status filter: ${filteredSessions.length} sessions`);
+    }
+
+    // Progress filter - FIXED: Use actual progress
+    if (filters.progress && filters.progress !== 'all') {
+        filteredSessions = filteredSessions.filter(session => {
+            const progress = this.getSessionProgress(session.id);
+            
+            if (filters.progress === 'complete') return progress === 100;
+            if (filters.progress === 'in-progress') return progress > 0 && progress < 100;
+            if (filters.progress === 'not-started') return progress === 0;
+            return true;
+        });
+        console.log(`📈 After progress filter: ${filteredSessions.length} sessions`);
+    }
+
+    // Date range filter - FIXED: Proper date handling
+    if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        filteredSessions = filteredSessions.filter(session => {
+            const sessionDate = new Date(session.date);
+            return sessionDate >= startDate;
+        });
+        console.log(`📅 After start date filter: ${filteredSessions.length} sessions`);
+    }
+
+    if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        filteredSessions = filteredSessions.filter(session => {
+            const sessionDate = new Date(session.date);
+            return sessionDate <= endDate;
+        });
+        console.log(`📅 After end date filter: ${filteredSessions.length} sessions`);
+    }
+
+    // Sort sessions
+    if (filters.sortBy) {
+        filteredSessions.sort((a, b) => {
+            let aValue, bValue;
+            
+            switch (filters.sortBy) {
+                case 'date':
+                    aValue = new Date(a.createdAt);
+                    bValue = new Date(b.createdAt);
+                    break;
+                case 'teacher':
+                    aValue = a.teacher.toLowerCase();
+                    bValue = b.teacher.toLowerCase();
+                    break;
+                case 'school':
+                    aValue = a.school.toLowerCase();
+                    bValue = b.school.toLowerCase();
+                    break;
+                case 'progress':
+                    aValue = this.getSessionProgress(a.id);
+                    bValue = this.getSessionProgress(b.id);
+                    break;
+                default:
+                    aValue = new Date(a.createdAt);
+                    bValue = new Date(b.createdAt);
+            }
+            
+            if (filters.sortOrder === 'asc') {
+                return aValue > bValue ? 1 : -1;
+            } else {
+                return aValue < bValue ? 1 : -1;
+            }
+        });
+    }
+
+    console.log(`✅ Final filtered sessions: ${filteredSessions.length}`);
+    return filteredSessions;
+}
+
+
 
     getFilterOptions() {
         const schools = [...new Set(this.sessions.map(s => s.school).filter(Boolean))];
@@ -231,7 +259,19 @@ class SessionManager {
     loadSessions() {
         try {
             const saved = localStorage.getItem('teacher_notes_sessions');
-            return saved ? JSON.parse(saved) : [];
+            if (saved) {
+                const sessions = JSON.parse(saved);
+                return sessions.map(session => ({
+                    ...session,
+                    unit: parseInt(session.unit) || 1,
+                    lesson: parseInt(session.lesson) || 1,
+                    date: session.date || new Date().toISOString().split('T')[0],
+                    school: session.school || '',
+                    campus: session.campus || '',
+                    teacher: session.teacher || ''
+                }));
+            }
+            return [];
         } catch (error) {
             console.error('Error loading sessions:', error);
             return [];
@@ -284,7 +324,12 @@ class SessionManager {
         const swipeContent = document.createElement('div');
         swipeContent.className = 'swipe-content session-card';
         
-        const notesCount = Object.keys(session.indicators).length;
+        // Count only indicators with actual notes (drawing data or performance type)
+        const notesCount = Object.keys(session.indicators).filter(indicatorId => {
+            const notes = session.indicators[indicatorId];
+            return notes && (notes.drawingData || notes.performanceType);
+        }).length;
+        
         const progress = this.getSessionProgress(session.id);
         
         swipeContent.innerHTML = `
@@ -444,10 +489,15 @@ class SessionManager {
     getSessionStats() {
         if (!this.currentSession) return { total: 0, withNotes: 0 };
         
-        const indicators = Object.keys(this.currentSession.indicators);
+        // Count only indicators with actual notes (drawing data or performance type)
+        const indicatorsWithNotes = Object.keys(this.currentSession.indicators).filter(indicatorId => {
+            const notes = this.currentSession.indicators[indicatorId];
+            return notes && (notes.drawingData || notes.performanceType);
+        });
+        
         return {
             total: 18, // Total number of indicators
-            withNotes: indicators.length
+            withNotes: indicatorsWithNotes.length
         };
     }
 
@@ -501,7 +551,12 @@ class SessionManager {
         const session = this.sessions.find(s => s.id === sessionId);
         if (!session) return 0;
         
-        const notesCount = Object.keys(session.indicators).length;
+        // Count only indicators with actual notes (drawing data or performance type)
+        const notesCount = Object.keys(session.indicators).filter(indicatorId => {
+            const notes = session.indicators[indicatorId];
+            return notes && (notes.drawingData || notes.performanceType);
+        }).length;
+        
         return Math.round((notesCount / 18) * 100);
     }
 
@@ -513,7 +568,10 @@ class SessionManager {
         return {
             ...session,
             progress: this.getSessionProgress(sessionId),
-            indicatorsWithNotes: Object.keys(session.indicators).length
+            indicatorsWithNotes: Object.keys(session.indicators).filter(indicatorId => {
+                const notes = session.indicators[indicatorId];
+                return notes && (notes.drawingData || notes.performanceType);
+            }).length
         };
     }
 
@@ -577,7 +635,10 @@ class SessionManager {
     // Method to get sessions with incomplete progress
     getIncompleteSessions() {
         return this.sessions.filter(session => {
-            const notesCount = Object.keys(session.indicators).length;
+            const notesCount = Object.keys(session.indicators).filter(indicatorId => {
+                const notes = session.indicators[indicatorId];
+                return notes && (notes.drawingData || notes.performanceType);
+            }).length;
             return notesCount < 18;
         });
     }
@@ -585,7 +646,10 @@ class SessionManager {
     // Method to get sessions with complete progress
     getCompleteSessions() {
         return this.sessions.filter(session => {
-            const notesCount = Object.keys(session.indicators).length;
+            const notesCount = Object.keys(session.indicators).filter(indicatorId => {
+                const notes = session.indicators[indicatorId];
+                return notes && (notes.drawingData || notes.performanceType);
+            }).length;
             return notesCount === 18;
         });
     }
