@@ -2,31 +2,158 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Notes App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Teacher Notes | Observation App</title>
     <link rel="stylesheet" href="styles/main.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pressure/2.2.1/pressure.min.js"></script>
 </head>
-<body>
-    <div class="app-container">
-        <header class="toolbar">
-            <div class="tools">
-                <button id="penBtn" class="tool active" data-tool="pen">✏️ Pen</button>
-                <button id="eraserBtn" class="tool" data-tool="eraser">🧽 Eraser</button>
-                <button id="clearBtn">🗑️ Clear</button>
-                <input type="color" id="colorPicker" value="#000000">
-                <input type="range" id="brushSize" min="1" max="30" value="4">
-                <span id="brushSizeValue">4px</span>
-            </div>
-        </header>
-
-        <main class="canvas-area">
-            <canvas id="noteCanvas"></canvas>
-        </main>
-
-        <div class="status">Tap with Apple Pencil to start drawing</div>
+<body class="railway-theme">
+    <!-- Session Dashboard -->
+    <div id="dashboard" class="dashboard">
+        <!-- ... existing dashboard code remains the same ... -->
     </div>
 
-    <!-- NO external libraries - just our code -->
+    <!-- Group View -->
+    <div id="groupView" class="group-view" style="display: none;">
+        <!-- ... existing group view code remains the same ... -->
+    </div>
+
+    <!-- Note Taking Interface -->
+    <div id="noteApp" class="app-container" style="display: none;">
+        <!-- Top Navigation -->
+        <nav class="app-nav">
+            <div class="nav-left">
+                <button id="backToDashboard" class="btn btn-ghost btn-with-icon">
+                    <span class="btn-icon">←</span>
+                    Back to Dashboard
+                </button>
+                <div class="nav-divider"></div>
+                <div class="session-breadcrumb">
+                    <span id="sessionInfo" class="session-title">Loading...</span>
+                    <span class="session-status">Draft</span>
+                </div>
+            </div>
+            <div class="nav-right">
+                <div class="nav-actions">
+                    <button class="btn btn-ghost" id="saveBtn">
+                        <span class="btn-icon">💾</span>
+                        Save
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="app-main">
+            <!-- Indicators Sidebar -->
+            <aside class="indicators-sidebar">
+                <div class="sidebar-header">
+                    <h3>Teaching Indicators</h3>
+                    <button id="collapseBtn" class="collapse-btn" title="Collapse sidebar">
+                        <span class="collapse-icon">◀</span>
+                    </button>
+                </div>
+                
+                <div class="sidebar-header">
+                    <div class="progress-indicator">
+                        <span id="progressCount">0/18</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Toggle -->
+                <div class="performance-toggle">
+                    <span class="toggle-label">View Mode</span>
+                    <div id="performanceToggle" class="toggle-switch">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+
+                <div id="indicatorsList" class="indicators-list">
+                    <!-- Indicators will be loaded here -->
+                </div>
+            </aside>
+
+            <!-- Drawing Canvas Area -->
+            <section class="canvas-section">
+                <div class="canvas-header">
+                    <div class="indicator-info">
+                        <h4 id="currentIndicatorTitle">Select an indicator to begin</h4>
+                        <p id="currentIndicatorDesc" class="indicator-description">
+                            Choose an indicator from the sidebar to start taking notes
+                        </p>
+                    </div>
+                    <div class="canvas-actions">
+                        <div class="tool-group">
+                            <button id="penBtn" class="tool-btn active" data-tool="pen" title="Pen">
+                                <span class="tool-icon icon-pen"></span>
+                            </button>
+                            <button id="eraserBtn" class="tool-btn" data-tool="eraser" title="Eraser">
+                                <span class="tool-icon icon-eraser"></span>
+                            </button>
+                            <button id="clearBtn" class="btn btn-ghost btn-small" title="Clear Canvas">
+                                <span class="btn-icon">🗑️</span>
+                                Clear
+                            </button>
+                        </div>
+                        <div class="tool-group">
+                            <input type="color" id="colorPicker" value="#FFFFFF" title="Color">
+                            <div class="brush-control">
+                                <input type="range" id="brushSize" class="brush-slider" min="1" max="12" value="3">
+                                <span id="brushSizeValue" class="brush-size">3px</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="canvas-container">
+                    <canvas id="noteCanvas"></canvas>
+                    <div class="canvas-overlay" id="canvasOverlay">
+                        <div class="overlay-content">
+                            <div class="overlay-icon">✏️</div>
+                            <h3>Select an indicator</h3>
+                            <p>Choose a teaching indicator from the sidebar to start taking notes with your Apple Pencil</p>
+                        </div>
+                    </div>
+
+                    <!-- Comments Toggle Button -->
+                    <div class="toggle-comments-btn">
+                        <button id="toggleComments" class="comments-toggle">
+                            <span class="btn-icon">💬</span>
+                            Comments
+                        </button>
+                    </div>
+
+                    <!-- Comments Palette -->
+                    <div id="commentsPalette" class="comments-palette">
+                        <div class="comments-header">
+                            <h4>Teaching Comments</h4>
+                            <button class="close-comments" id="closeComments">
+                                <span class="btn-icon">×</span>
+                            </button>
+                        </div>
+                        <div class="comments-list" id="commentsList">
+                            <!-- Comments will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="canvas-footer">
+                    <div class="status-indicator">
+                        <span id="appStatus" class="status-text">Ready for Apple Pencil</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ... rest of your modals remain the same ... -->
+
+    <script src="js/indicators.js"></script>
+    <script src="js/groupsManager.js"></script>
+    <script src="js/sessionManager.js"></script>
     <script src="js/drawing.js"></script>
     <script src="js/app.js"></script>
 </body>
