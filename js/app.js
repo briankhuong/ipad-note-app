@@ -1369,18 +1369,15 @@ class App {
 
     // UI State Management
     updateProgress() {
-        const stats = this.sessionManager.getSessionStats();
-        const progressCount = document.getElementById('progressCount');
-        const progressFill = document.getElementById('progressFill');
-        
-        if (progressCount) {
-            progressCount.textContent = `${stats.withNotes}/${stats.total}`;
-        }
-        if (progressFill) {
-            const percentage = (stats.withNotes / stats.total) * 100;
-            progressFill.style.width = `${percentage}%`;
-        }
-    }
+    const progressCount = document.getElementById('progressCount');
+    const progressFill = document.getElementById('progressFill');
+    
+    const stats = this.indicatorsManager.getPerformanceStats(this.sessionManager);
+    const completed = stats.total; // Now only non-empty
+    
+    progressCount.textContent = `${completed}/18`;
+    progressFill.style.width = `${(completed / 18) * 100}%`;
+}
 
     updateCounts() {
         const sessionsCount = document.getElementById('sessionsCount');

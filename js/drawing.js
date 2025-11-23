@@ -177,16 +177,24 @@ class DrawingCanvas {
     }
 
     saveDrawing() {
-        if (this.currentIndicatorId && this.onSaveCallback) {
-            try {
-                this.currentDrawingData = this.canvas.toDataURL();
-                this.onSaveCallback(this.currentIndicatorId, this.currentDrawingData, this.currentPerformanceType);
-                console.log('✅ Drawing saved for:', this.currentIndicatorId, 'Type:', this.currentPerformanceType);
-            } catch (error) {
-                console.error('❌ Error saving drawing:', error);
-            }
-        }
+    if (!this.currentIndicatorId) return;
+
+    const drawingData = this.getDrawingData(); // Assume this gets lines/paths
+    
+    // FIXED: Only save if has drawing or other content (performance from session notes)
+    if (drawingData.length === 0) {
+        console.log('No drawing content - skipping save');
+        return;
     }
+
+    // Get current performance from session (don't default to 'good')
+    const notes = window.app.sessionManager.getIndicatorNotes(this.currentIndicatorId) || {};
+    const performanceType = notes.performanceType || null; // No default
+
+    if (this.onSaveCallback) {
+        this.onSaveCallback(this.currentIndicatorId, drawingData, performanceType);
+    }
+}
 
     loadDrawing(drawingData) {
         if (drawingData) {
