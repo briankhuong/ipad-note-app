@@ -913,40 +913,46 @@ class App {
     // Enhanced Features
     toggleSidebar() {       
     console.log('toggleSidebar called');
-    console.log('Collapse button:', document.getElementById('collapseBtn'));
-    console.log('Expand button:', document.getElementById('sidebar-toggle-btn'));
     const sidebar = document.querySelector('.indicators-sidebar');
     const collapseBtn = document.getElementById('collapseBtn');
     const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
     const collapseIcon = collapseBtn?.querySelector('.collapse-icon');
     const toggleIcon = sidebarToggleBtn?.querySelector('.toggle-icon');
 
+    if (!sidebar) {
+        console.error('Sidebar not found!');
+        return;
+    }
+    if (!sidebarToggleBtn) {
+        console.error('Sidebar toggle button not found! Check HTML ID.');
+        return;
+    }
 
     console.log('Before - Sidebar collapsed:', sidebar.classList.contains('collapsed'));
     console.log('Before - Collapse btn display:', collapseBtn?.style.display);
     console.log('Before - Expand btn display:', sidebarToggleBtn?.style.display);
     
-    this.isSidebarCollapsed = !this.isSidebarCollapsed;
+    // Use class to determine current state (more reliable than flag if page reloads or state drifts)
+    this.isSidebarCollapsed = !sidebar.classList.contains('collapsed');  // Flip based on actual class
     
     if (this.isSidebarCollapsed) {
         sidebar.classList.add('collapsed');
         if (collapseIcon) collapseIcon.textContent = '▶';
         if (toggleIcon) toggleIcon.textContent = '◀';
-        collapseBtn.setAttribute('title', 'Expand sidebar');
-        if (sidebarToggleBtn) {
-            sidebarToggleBtn.style.display = 'flex'; // SHOW expand button
-            sidebarToggleBtn.setAttribute('title', 'Expand sidebar');
-        }
+        if (collapseBtn) collapseBtn.setAttribute('title', 'Expand sidebar');
+        sidebarToggleBtn.style.display = 'flex';  // SHOW expand button
+        sidebarToggleBtn.setAttribute('title', 'Expand sidebar');
     } else {
         sidebar.classList.remove('collapsed');
         if (collapseIcon) collapseIcon.textContent = '◀';
         if (toggleIcon) toggleIcon.textContent = '▶';
-        collapseBtn.setAttribute('title', 'Collapse sidebar');
-        if (sidebarToggleBtn) {
-            sidebarToggleBtn.style.display = 'none'; // HIDE expand button
-            sidebarToggleBtn.setAttribute('title', 'Collapse sidebar');
-        }
+        if (collapseBtn) collapseBtn.setAttribute('title', 'Collapse sidebar');
+        sidebarToggleBtn.style.display = 'none';  // HIDE expand button
+        sidebarToggleBtn.setAttribute('title', 'Collapse sidebar');
     }
+
+    console.log('After - Sidebar collapsed:', sidebar.classList.contains('collapsed'));
+    console.log('After - Expand btn display:', sidebarToggleBtn.style.display);
     
     setTimeout(() => {
         this.drawingCanvas.resizeCanvas();
@@ -1516,8 +1522,11 @@ class App {
     }
 }
 
+
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     new App();
     console.log('🚀 Teacher Notes App Started with Enhanced Features!');
 });
+
+

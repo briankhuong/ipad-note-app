@@ -544,6 +544,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative; /* Allows absolute positioning for toggle button */
 }
 
 .app-nav {
@@ -627,7 +628,6 @@ body {
   margin-left: 0;
   width: calc(100% - 320px);
 }
-
 
 /* Ensure collapse button is always visible in canvas section */
 .canvas-section .collapse-btn {
@@ -1493,99 +1493,28 @@ body {
   }
 }
 
-
-
-/* ===== CLEAN SIDEBAR TOGGLE BUTTON FIX ===== */
-
-/* Collapse button (inside sidebar) - normal state */
-.indicators-sidebar:not(.collapsed) .collapse-btn {
-    display: flex !important;
-    position: relative !important;
+/* Sidebar Toggle Button Styles */
+#sidebar-toggle-btn.sidebar-toggle {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1001; /* Higher than sidebar */
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-left: none; /* To blend with edge */
+  padding: var(--space-3) var(--space-2);
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 1;
+  visibility: visible;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  transition: left 0.3s ease, background 0.2s ease;
 }
 
-/* Collapse button - when sidebar is collapsed */
-.indicators-sidebar.collapsed .collapse-btn {
-    display: none !important; /* Hide the original collapse button */
-}
-
-/* Expand button (persistent) - normal state */
-#sidebar-toggle-btn {
-    display: none !important; /* Hidden when sidebar is visible */
-    position: fixed;
-    top: 80px;
-    left: 20px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-md);
-    padding: var(--space-2);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    z-index: 1001;
-    box-shadow: var(--shadow-lg);
-    width: 32px;
-    height: 32px;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Expand button - when sidebar is collapsed */
-.indicators-sidebar.collapsed ~ #sidebar-toggle-btn {
-    display: flex !important; /* Show expand button when sidebar collapsed */
-}
-
-/* Button hover states */
-.collapse-btn:hover,
-#sidebar-toggle-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-
-/* ===== FIX SIDEBAR COLLAPSE BEHAVIOR ===== */
-
-.indicators-sidebar {
-    width: 320px;
-    min-width: 280px;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border-primary);
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    z-index: 100;
-    height: 100%;
-    overflow: hidden;
-}
-
-/* FIXED: Proper sidebar collapse */
-.indicators-sidebar.collapsed {
-    transform: translateX(-100%) !important;
-    position: absolute !important;
-    height: 100% !important;
-    z-index: 1000 !important;
-}
-
-/* Ensure canvas expands when sidebar collapses */
-.indicators-sidebar:not(.collapsed) + .canvas-section {
-    width: calc(100% - 320px);
-}
-
-.indicators-sidebar.collapsed + .canvas-section {
-    width: 100% !important;
-    margin-left: 0 !important;
-}
-
-/* TEMPORARY DEBUG - Remove after testing */
-.indicators-sidebar {
-    border: 2px solid red !important;
-}
-
-.indicators-sidebar.collapsed {
-    border: 2px solid blue !important;
-    background: rgba(255, 0, 0, 0.1) !important;
-}
-
-.canvas-section {
-    border: 2px solid green !important;
+#sidebar-toggle-btn.sidebar-toggle:hover {
+  background: var(--bg-hover);
+  left: 2px; /* Slight slide out on hover */
 }
