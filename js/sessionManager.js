@@ -314,82 +314,81 @@ class SessionManager {
   }
 
   createSessionElement(session, onSessionSelect, onSessionEdit, onSessionDelete) {
-    const swipeContainer = document.createElement('div');
-    swipeContainer.className = 'swipe-container';
-    swipeContainer.dataset.id = session.id;
+  const swipeContainer = document.createElement('div');
+  swipeContainer.className = 'swipe-container';
+  swipeContainer.dataset.id = session.id;
 
-    const swipeContent = document.createElement('div');
-    swipeContent.className = 'swipe-content session-card';
+  const swipeContent = document.createElement('div');
+  swipeContent.className = 'swipe-content session-card';
 
-    // Count only indicators with actual notes (drawing data or performance type)
-    const notesCount = Object.keys(session.indicators).filter(indicatorId => {
-      const notes = session.indicators[indicatorId];
-      return notes && (notes.drawingData || notes.performanceType);
-    }).length;
+  // Count only indicators with actual notes (drawing data or performance type or autoComment)
+  const notesCount = Object.entries(session.indicators || {}).filter(([_, notes]) => {
+    return notes && ((notes.drawingData && notes.drawingData.length > 0) || notes.performanceType || notes.autoComment);
+  }).length;
 
-    const progress = this.getSessionProgress(session.id);
+  const progress = Math.round((notesCount / 18) * 100);
 
-    swipeContent.innerHTML = `
-      <div class="session-header">
-        <div class="session-teacher">${session.teacher}</div>
+  swipeContent.innerHTML = `
+    <h3><strong>${session.teacher}</strong></h3>
+    <p class="session-meta">
+      ${session.school}${session.campus ? ` · ${session.campus}` : ''}<br>
+      Unit ${session.unit} · Lesson ${session.lesson}<br>
+      ${new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+    </p>
+    <div class="session-stats">
+      <div class="progress-info">
+        <span>${notesCount} of 18 indicators</span>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: ${progress}%"></div>
+        </div>
       </div>
-      <div class="session-meta">
-        ${session.school}${session.campus ? ` • ${session.campus}` : ''}
-      </div>
-      <div class="session-details">
-        Unit ${session.unit} • Lesson ${session.lesson}
-      </div>
-      <div class="session-date">
-        ${new Date(session.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-      </div>
-      <div class="session-progress">
-        ${notesCount} of 18 indicators ${session.status.toUpperCase()}
-      </div>
-    `;
+      <span class="session-status">${session.status.toUpperCase()}</span>
+    </div>
+  `;
 
-    const swipeActions = document.createElement('div');
-    swipeActions.className = 'swipe-actions';
-    swipeActions.innerHTML = `
-      <div class="swipe-action edit">Edit</div>
-      <div class="swipe-action delete">Delete</div>
-    `;
+  const swipeActions = document.createElement('div');
+  swipeActions.className = 'swipe-actions';
+  swipeActions.innerHTML = `
+    <div class="swipe-action edit">Edit</div>
+    <div class="swipe-action delete">Delete</div>
+  `;
 
-    swipeContainer.appendChild(swipeContent);
-    swipeContainer.appendChild(swipeActions);
+  swipeContainer.appendChild(swipeContent);
+  swipeContainer.appendChild(swipeActions);
 
-    // Click to select session
-    swipeContent.addEventListener('click', (e) => {
-      // Only select if not swiped
-      if (!swipeContainer.classList.contains('swiped')) {
-        console.log('Session selected:', session.id);
-        onSessionSelect(session.id);
-      }
-    });
+  // Click to select session
+  swipeContent.addEventListener('click', (e) => {
+    // Only select if not swiped
+    if (!swipeContainer.classList.contains('swiped')) {
+      console.log('Session selected:', session.id);
+      onSessionSelect(session.id);
+    }
+  });
 
-    // Edit button event
-    swipeActions.querySelector('.swipe-action.edit').addEventListener('click', (e) => {
-      e.stopPropagation();
-      console.log('Edit session clicked:', session.id);
-      swipeContainer.classList.remove('swiped');
-      swipeContent.style.transform = 'translateX(0)';
-      swipeActions.style.transform = 'translateX(100%)';
-      onSessionEdit(session.id);
-    });
+  // Edit button event
+  swipeActions.querySelector('.swipe-action.edit').addEventListener('click', (e) => {
+    e.stopPropagation();
+    console.log('Edit session clicked:', session.id);
+    swipeContainer.classList.remove('swiped');
+    swipeContent.style.transform = 'translateX(0)';
+    swipeActions.style.transform = 'translateX(100%)';
+    onSessionEdit(session.id);
+  });
 
-    // Delete button event
-    swipeActions.querySelector('.swipe-action.delete').addEventListener('click', (e) => {
-      e.stopPropagation();
-      console.log('Delete session clicked:', session.id);
-      swipeContainer.classList.remove('swiped');
-      swipeContent.style.transform = 'translateX(0)';
-      swipeActions.style.transform = 'translateX(100%)';
-      onSessionDelete(session.id);
-    });
+  // Delete button event
+  swipeActions.querySelector('.swipe-action.delete').addEventListener('click', (e) => {
+    e.stopPropagation();
+    console.log('Delete session clicked:', session.id);
+    swipeContainer.classList.remove('swiped');
+    swipeContent.style.transform = 'translateX(0)';
+    swipeActions.style.transform = 'translateX(100%)';
+    onSessionDelete(session.id);
+  });
 
-    // Setup swipe functionality
-    this.setupSwipe(swipeContainer, swipeContent, swipeActions);
-    return swipeContainer;
-  }
+  // Setup swipe functionality
+  this.setupSwipe(swipeContainer, swipeContent, swipeActions);
+  return swipeContainer;
+}
 
   setupSwipe(container, content, actions) {
     let startX = 0;
@@ -442,9 +441,8 @@ class SessionManager {
   getSessionProgress(sessionId) {
     const session = this.sessions.find(s => s.id === sessionId);
     if (!session) return 0;
-    const notesCount = Object.keys(session.indicators).filter(indicatorId => {
-      const notes = session.indicators[indicatorId];
-      return notes && (notes.drawingData || notes.performanceType);
+    const notesCount = Object.entries(session.indicators || {}).filter(([_, notes]) => {
+      return (notes.drawingData && notes.drawingData.length > 0) || notes.performanceType || notes.autoComment;
     }).length;
     return Math.round((notesCount / 18) * 100);
   }
@@ -504,3 +502,4 @@ class SessionManager {
     });
   }
 }
+
