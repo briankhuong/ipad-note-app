@@ -547,18 +547,18 @@ filterSessions(filters = {}) {
     }
 
     // Method to get session progress percentage
-    getSessionProgress(sessionId) {
-        const session = this.sessions.find(s => s.id === sessionId);
-        if (!session) return 0;
-        
-        // Count only indicators with actual notes (drawing data or performance type)
-        const notesCount = Object.keys(session.indicators).filter(indicatorId => {
-            const notes = session.indicators[indicatorId];
-            return notes && (notes.drawingData || notes.performanceType);
-        }).length;
-        
-        return Math.round((notesCount / 18) * 100);
-    }
+   getSessionProgress(sessionId) {
+    const session = this.sessions.find(s => s.id === sessionId);
+    if (!session) return 0;
+    
+    // FIX: Count only indicators with actual content (drawing or performance type)
+    const notesCount = Object.keys(session.indicators).filter(indicatorId => {
+        const notes = session.indicators[indicatorId];
+        return notes && (notes.drawingData || notes.performanceType);
+    }).length;
+    
+    return Math.round((notesCount / 18) * 100);
+}
 
     // Method to export session data
     exportSessionData(sessionId) {

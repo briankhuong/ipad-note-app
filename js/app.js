@@ -4,6 +4,7 @@ class App {
         this.groupsManager = new GroupsManager();
         this.indicatorsManager = new IndicatorsManager();
         this.drawingCanvas = new DrawingCanvas('noteCanvas');
+    
         
         // Make groupsManager globally available for sessionManager
         window.groupsManager = this.groupsManager;
@@ -30,6 +31,12 @@ class App {
         this.editingSessionId = null;
         this.editingGroupId = null;
         this.currentGroupId = null;
+        
+        
+     /*       
+    this.initializeSidebarToggle(); // ADD THIS LINE
+    this.setupCollapseButton();     // ADD THIS LINE
+    */
     }
 
     setupEventListeners() {
@@ -219,13 +226,8 @@ class App {
             });
         }
 
-        // New event listeners for enhanced features
-        const collapseBtn = document.getElementById('collapseBtn');
-        if (collapseBtn) {
-            collapseBtn.addEventListener('click', () => {
-                this.toggleSidebar();
-            });
-        }
+        // Setup sidebar toggle buttons
+        this.setupSidebarToggle();
 
         // Global filter toggle
         const globalFilter = document.getElementById('globalFilter');
@@ -262,21 +264,15 @@ class App {
 
     // FIX 1: Back button in group view
     setupGroupViewBackButton() {
-        // Group view events - FIX: Proper back button binding
-        this.setupGroupViewBackButton();
-    }
-
-    // FIX 1: Back button in group view
-    setupGroupViewBackButton() {
+        // Group view events - FIX: Back button
         const backToGroups = document.getElementById('backToGroups');
         if (backToGroups) {
-            // Remove any existing event listeners
-            const newBackButton = backToGroups.cloneNode(true);
-            backToGroups.parentNode.replaceChild(newBackButton, backToGroups);
+            // Remove and re-add to ensure clean event listener
+            const newBackBtn = backToGroups.cloneNode(true);
+            backToGroups.parentNode.replaceChild(newBackBtn, backToGroups);
             
-            // Add new event listener
             document.getElementById('backToGroups').addEventListener('click', () => {
-                console.log('Back to groups clicked - working!');
+                console.log('Back button clicked - working!');
                 this.showGroupsTab();
             });
         }
@@ -490,7 +486,26 @@ class App {
     }
 
     showGroupsTab() {
+        console.log('showGroupsTab called');
+        
+        // 1. Hide the group view
+        const groupView = document.getElementById('groupView');
+        if (groupView) {
+            groupView.style.display = 'none';
+            console.log('Group view hidden');
+        }
+        
+        // 2. Show the dashboard (the container that holds the tabs)
+        const dashboard = document.getElementById('dashboard');
+        if (dashboard) {
+            dashboard.style.display = 'block';
+            console.log('Dashboard shown');
+        }
+        
+        // 3. Now switch to the groups tab
         this.switchTab('groups');
+        
+        console.log('Successfully returned to groups view');
     }
 
     showNoteApp() {
@@ -555,39 +570,39 @@ class App {
     }
 
     // FIX 4: Campus dropdown in edit observation
-    // FIX 4: Campus dropdown in edit observation
     editSession(sessionId) {
-        const session = this.sessionManager.getSessionForEdit(sessionId);
-        if (session) {
-            this.editingSessionId = sessionId;
-            
-            // Populate school dropdowns first
-            this.populateSchoolDropdowns();
-            
-            // Set form values
-            document.getElementById('editSchoolSelect').value = session.school || '';
-            document.getElementById('editTeacher').value = session.teacher || '';
-            document.getElementById('editDate').value = session.date || '';
-            document.getElementById('editUnit').value = session.unit || '';
-            document.getElementById('editLesson').value = session.lesson || '';
-            
-            // FIX: Force campus dropdown to populate and set value
-            setTimeout(() => {
-                // Trigger campus dropdown population
+    const session = this.sessionManager.getSessionForEdit(sessionId);
+    if (session) {
+        this.editingSessionId = sessionId;
+        
+        // Populate school dropdowns first
+        this.populateSchoolDropdowns();
+        
+        // Set form values
+        document.getElementById('editSchoolSelect').value = session.school || '';
+        document.getElementById('editTeacher').value = session.teacher || '';
+        document.getElementById('editDate').value = session.date || '';
+        document.getElementById('editUnit').value = session.unit || '';
+        document.getElementById('editLesson').value = session.lesson || '';
+        
+        // FIX: Wait for DOM to update, then populate campuses
+        setTimeout(() => {
+            if (session.school) {
                 this.handleSchoolSelection('editSchoolSelect', session.school);
                 
-                // Set campus value after a short delay to ensure dropdown is populated
+                // Set campus after campuses are loaded
                 setTimeout(() => {
                     const campusSelect = document.getElementById('editCampus');
                     if (campusSelect) {
                         campusSelect.value = session.campus || '';
                     }
-                }, 100);
-            }, 150);
-            
-            document.getElementById('editSessionModal').style.display = 'flex';
-        }
+                }, 150);
+            }
+        }, 100);
+        
+        document.getElementById('editSessionModal').style.display = 'flex';
     }
+}
 
     updateSession(sessionId) {
         const form = document.getElementById('editSessionForm');
@@ -883,39 +898,71 @@ class App {
         
         this.hideConfirmationModal();
     }
+/*
+    // ADD THIS METHOD - Setup collapse button
+    setupCollapseButton() {
+        const collapseBtn = document.getElementById('collapseBtn');
+        if (collapseBtn) {
+            collapseBtn.addEventListener('click', () => {
+                this.toggleSidebar();
+            });
+        }
+    }
+*/
 
     // Enhanced Features
-    toggleSidebar() {
-        const sidebar = document.querySelector('.indicators-sidebar');
-        const collapseBtn = document.getElementById('collapseBtn');
-        const collapseIcon = collapseBtn?.querySelector('.collapse-icon');
-        
-        if (!sidebar || !collapseBtn) return;
-        
-        this.isSidebarCollapsed = !this.isSidebarCollapsed;
-        
-        if (this.isSidebarCollapsed) {
-            sidebar.classList.add('collapsed');
-            if (collapseIcon) {
-                collapseIcon.textContent = '▶';
-            }
-            collapseBtn.setAttribute('title', 'Expand sidebar');
-            // FIX: Ensure collapse button remains visible
-            collapseBtn.style.display = 'flex';
-        } else {
-            sidebar.classList.remove('collapsed');
-            if (collapseIcon) {
-                collapseIcon.textContent = '◀';
-            }
-            collapseBtn.setAttribute('title', 'Collapse sidebar');
-            collapseBtn.style.display = 'flex';
+    toggleSidebar() {       
+    console.log('toggleSidebar called');
+    console.log('Collapse button:', document.getElementById('collapseBtn'));
+    console.log('Expand button:', document.getElementById('sidebar-toggle-btn'));
+    const sidebar = document.querySelector('.indicators-sidebar');
+    const collapseBtn = document.getElementById('collapseBtn');
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+    const collapseIcon = collapseBtn?.querySelector('.collapse-icon');
+    const toggleIcon = sidebarToggleBtn?.querySelector('.toggle-icon');
+
+
+    console.log('Before - Sidebar collapsed:', sidebar.classList.contains('collapsed'));
+    console.log('Before - Collapse btn display:', collapseBtn?.style.display);
+    console.log('Before - Expand btn display:', sidebarToggleBtn?.style.display);
+    
+    this.isSidebarCollapsed = !this.isSidebarCollapsed;
+    
+    if (this.isSidebarCollapsed) {
+        sidebar.classList.add('collapsed');
+        if (collapseIcon) collapseIcon.textContent = '▶';
+        if (toggleIcon) toggleIcon.textContent = '◀';
+        collapseBtn.setAttribute('title', 'Expand sidebar');
+        if (sidebarToggleBtn) {
+            sidebarToggleBtn.style.display = 'flex'; // SHOW expand button
+            sidebarToggleBtn.setAttribute('title', 'Expand sidebar');
         }
-        
-        // Redraw canvas to adjust to new layout
-        setTimeout(() => {
-            this.drawingCanvas.resizeCanvas();
-        }, 300);
+    } else {
+        sidebar.classList.remove('collapsed');
+        if (collapseIcon) collapseIcon.textContent = '◀';
+        if (toggleIcon) toggleIcon.textContent = '▶';
+        collapseBtn.setAttribute('title', 'Collapse sidebar');
+        if (sidebarToggleBtn) {
+            sidebarToggleBtn.style.display = 'none'; // HIDE expand button
+            sidebarToggleBtn.setAttribute('title', 'Collapse sidebar');
+        }
     }
+    
+    setTimeout(() => {
+        this.drawingCanvas.resizeCanvas();
+    }, 300);
+}
+
+// Make sure to initialize the button as hidden
+/*initializeSidebarToggle() {
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+    if (sidebarToggleBtn) {
+        sidebarToggleBtn.style.display = 'none'; // Start hidden
+        sidebarToggleBtn.addEventListener('click', () => {
+            this.toggleSidebar();
+        });
+    }
+}*/
 
     updateIndicatorPerformanceDisplay() {
         const indicators = document.querySelectorAll('.indicator-item');
@@ -1384,6 +1431,24 @@ class App {
             this.toggleSidebar();
         }
     }
+
+    setupSidebarToggle() {
+    const collapseBtn = document.getElementById('collapseBtn');
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn'); // Note: changed ID
+    
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', () => {
+            this.toggleSidebar();
+        });
+    }
+    
+    if (sidebarToggleBtn) {
+        sidebarToggleBtn.addEventListener('click', () => {
+            this.toggleSidebar();
+        });
+    }
+}
+
 
     // Notification System
     showNotification(message, type = 'success') {

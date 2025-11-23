@@ -328,26 +328,26 @@ class IndicatorsManager {
     }
 
     // FIX 2: Set active indicator - Only remove active class, keep performance classes
-    // FIX 2: Set active indicator - Only remove active class, keep performance classes
     setActiveIndicator(indicatorId) {
-        // Remove ONLY active class from all indicators
-        document.querySelectorAll('.indicator-item').forEach(item => {
-            item.classList.remove('active');
-        });
+    // Remove ONLY active class, keep performance classes
+    document.querySelectorAll('.indicator-item').forEach(item => {
+        item.classList.remove('active');
+        // DO NOT remove 'has-notes', 'good-point', 'growth-area' classes here
+    });
+    
+    // Add active class to selected indicator ONLY
+    const activeIndicator = document.querySelector(`[data-id="${indicatorId}"]`);
+    if (activeIndicator) {
+        activeIndicator.classList.add('active');
+        this.activeIndicatorId = indicatorId;
         
-        // Add active class to selected indicator ONLY
-        const activeIndicator = document.querySelector(`[data-id="${indicatorId}"]`);
-        if (activeIndicator) {
-            activeIndicator.classList.add('active');
-            this.activeIndicatorId = indicatorId;
-            
-            // Scroll the active indicator into view
-            activeIndicator.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest'
-            });
-        }
+        // Scroll the active indicator into view
+        activeIndicator.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        });
     }
+}
 
     getIndicatorById(id) {
         return this.indicators.find(ind => ind.id === id);

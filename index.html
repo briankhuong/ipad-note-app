@@ -211,6 +211,9 @@
                 </div>
             </section>
         </div>
+        <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="Expand indicators sidebar">
+            <span class="toggle-icon">▶</span>
+        </button>
     </div>
 
     <!-- New Session Modal -->
@@ -278,7 +281,10 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Campus</label>
-                    <input type="text" id="editCampus" class="form-input" placeholder="Campus name">
+                    <select id="editCampus" class="form-select" required>
+                        <option value="">Select Campus</option>
+                        <!-- Campuses will be populated dynamically based on school -->
+                    </select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Teacher Name</label>
