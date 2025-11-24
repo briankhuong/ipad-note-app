@@ -156,40 +156,55 @@ class DrawingCanvas {
         this.onSaveCallback = callback;
     }
 
-    setCurrentIndicator(indicatorId, indicatorData, performanceType = 'good') {
-        console.log('Switching to indicator:', indicatorId, 'Performance type:', performanceType);
-        
-        // Save current drawing before switching
-        if (this.currentIndicatorId && this.currentIndicatorId !== indicatorId) {
-            this.saveDrawing();
-        }
-        
-        this.currentIndicatorId = indicatorId;
-        this.currentPerformanceType = performanceType || 'good';
-        
-        // Clear current drawing data until we load the new one
-        this.currentDrawingData = null;
-        
-        // Force resize to ensure clean canvas
-        setTimeout(() => {
-            this.resizeCanvas();
-        }, 10);
+    setCurrentIndicator(indicatorId, indicatorData, performanceType = null) { // FIXED: default to null, not 'good'
+    console.log('Switching to indicator:', indicatorId, 'Performance type:', performanceType);
+    
+    // Save current drawing before switching
+    if (this.currentIndicatorId && this.currentIndicatorId !== indicatorId) {
+        this.saveDrawing();
     }
+    
+    this.currentIndicatorId = indicatorId;
+    this.currentPerformanceType = performanceType; // FIXED: Use passed value, no default
+    
+    // Clear current drawing data until we load the new one
+    this.currentDrawingData = null;
+    
+    // Force resize to ensure clean canvas
+    setTimeout(() => {
+        this.resizeCanvas();
+    }, 10);
+}
+// Add this method to the DrawingCanvas class
+getDrawingData() {
+    // Return the canvas data as base64 image
+    return this.canvas.toDataURL('image/png');
+}
 
-    saveDrawing() {
+// Also update the saveDrawing method to use this:
+saveDrawing() {
     if (!this.currentIndicatorId) return;
 
-    const drawingData = this.getDrawingData(); // Assume this gets lines/paths
+    const drawingData = this.getDrawingData();
     
-    // FIXED: Only save if has drawing or other content (performance from session notes)
-    if (drawingData.length === 0) {
-        console.log('No drawing content - skipping save');
+    // FIXED: Better check for actual drawing content
+    // Base64 images always have some length, so we need a better check
+    const hasMeaningfulDrawing = this.hasDrawing(); // Use the existing method
+    
+    console.log('Save drawing check:', {
+        indicatorId: this.currentIndicatorId,
+        drawingDataLength: drawingData.length,
+        hasMeaningfulDrawing: hasMeaningfulDrawing
+    });
+
+    if (!hasMeaningfulDrawing) {
+        console.log('No meaningful drawing content - skipping save');
         return;
     }
 
-    // Get current performance from session (don't default to 'good')
+    // Get current performance from session
     const notes = window.app.sessionManager.getIndicatorNotes(this.currentIndicatorId) || {};
-    const performanceType = notes.performanceType || null; // No default
+    const performanceType = notes.performanceType || null;
 
     if (this.onSaveCallback) {
         this.onSaveCallback(this.currentIndicatorId, drawingData, performanceType);
@@ -377,27 +392,28 @@ class DrawingCanvas {
 
     // New method to check if canvas has any drawing
     hasDrawing() {
-        // Create a temporary canvas to check if there's any non-transparent content
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCanvas.width = this.canvas.width;
-        tempCanvas.height = this.canvas.height;
-        
-        // Draw the current canvas onto temp canvas
-        tempCtx.drawImage(this.canvas, 0, 0);
-        
-        // Get image data and check for non-transparent pixels
-        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-        const data = imageData.data;
-        
-        for (let i = 0; i < data.length; i += 4) {
-            if (data[i + 3] !== 0) { // Check alpha channel
-                return true;
-            }
+    // Create a temporary canvas to check if there's any non-transparent content
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = this.canvas.width;
+    tempCanvas.height = this.canvas.height;
+    
+    // Draw the current canvas onto temp canvas
+    tempCtx.drawImage(this.canvas, 0, 0);
+    
+    // Get image data and check for non-transparent pixels
+    const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+    const data = imageData.data;
+    
+    // Check if there are any non-transparent pixels (alpha > 0)
+    for (let i = 3; i < data.length; i += 4) {
+        if (data[i] !== 0) {
+            return true;
         }
-        
-        return false;
     }
+    
+    return false;
+}
 
     // New method to undo last stroke (basic implementation)
     undo() {

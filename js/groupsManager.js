@@ -1,13 +1,25 @@
 class GroupsManager {
-    constructor() {
-        this.groups = this.loadGroups();
-        this.trash = this.loadTrash();
-        
-        // Pre-create schools if none exist
-        if (this.groups.length === 0) {
-            this.preCreateSchools();
-        }
+   constructor() {
+    this.groups = this.loadGroups();
+    this.trash = this.loadTrash();
+    this.selectedGroups = new Set();
+    
+    console.log('=== DEBUG: GroupsManager Constructor ===');
+    console.log('Loaded groups:', this.groups.length);
+    console.log('Loaded trash:', this.trash.length);
+    
+    // Pre-create schools if none exist
+    if (this.groups.length === 0) {
+        console.log('No groups found, pre-creating schools...');
+        this.preCreateSchools();
+        this.saveGroups(); // Ensure they're saved
+        console.log('After pre-creation:', this.groups.length);
+    } else {
+        console.log('Using existing groups from storage');
     }
+    
+    console.log('Final groups count:', this.groups.length);
+}
 
     preCreateSchools() {
         const schools = [
@@ -105,18 +117,25 @@ class GroupsManager {
     }
 
     updateGroup(groupId, updates) {
-        const groupIndex = this.groups.findIndex(g => g.id === groupId);
-        if (groupIndex >= 0) {
-            this.groups[groupIndex] = {
-                ...this.groups[groupIndex],
-                ...updates,
-                updatedAt: new Date().toISOString()
-            };
-            this.saveGroups();
-            return this.groups[groupIndex];
-        }
-        return null;
+    console.log('GroupsManager: Updating group', groupId, 'with:', updates);
+    
+    const groupIndex = this.groups.findIndex(g => g.id === groupId);
+    if (groupIndex >= 0) {
+        // FIXED: Preserve existing properties and only update provided ones
+        this.groups[groupIndex] = {
+            ...this.groups[groupIndex], // Keep existing data
+            ...updates, // Apply updates
+            updatedAt: new Date().toISOString()
+        };
+        
+        console.log('Group updated successfully:', this.groups[groupIndex]);
+        this.saveGroups();
+        return this.groups[groupIndex];
     }
+    
+    console.error('Group not found for update:', groupId);
+    return null;
+}
 
     deleteGroup(groupId, moveToTrash = true) {
         const groupIndex = this.groups.findIndex(g => g.id === groupId);
@@ -129,6 +148,11 @@ class GroupsManager {
             
             this.groups.splice(groupIndex, 1);
             this.saveGroups();
+            
+            // Remove from selected groups if it was selected
+            this.selectedGroups.delete(groupId);
+            this.updateGroupsBulkActionsUI();
+            
             return true;
         }
         return false;
@@ -148,6 +172,7 @@ class GroupsManager {
         
         this.trash.unshift(trashItem);
         this.saveTrash();
+        console.log(`Moved ${type} to trash:`, trashItem);
     }
 
     restoreFromTrash(trashId) {
@@ -188,12 +213,15 @@ class GroupsManager {
     }
 
     permanentlyDelete(trashId) {
+        console.log('GroupsManager: Permanently deleting trash item:', trashId);
         const trashIndex = this.trash.findIndex(t => t.trashId === trashId);
         if (trashIndex >= 0) {
             this.trash.splice(trashIndex, 1);
             this.saveTrash();
+            console.log('GroupsManager: Item permanently deleted from trash');
             return true;
         }
+        console.log('GroupsManager: Item not found in trash for permanent deletion');
         return false;
     }
 
@@ -230,7 +258,7 @@ class GroupsManager {
         );
     }
 
-    // FIXED: Ensure groups list renders properly
+    // FIXED: Groups list with checkboxes
     renderGroupsList(container, onGroupView, onGroupEdit, onGroupDelete) {
         console.log('Rendering groups list:', this.groups.length, 'groups');
         
@@ -260,154 +288,194 @@ class GroupsManager {
             const groupElement = this.createGroupElement(group, onGroupView, onGroupEdit, onGroupDelete);
             container.appendChild(groupElement);
         });
+
+        // FIXED: Update bulk actions UI after rendering
+        this.updateGroupsBulkActionsUI();
     }
 
     createGroupElement(group, onGroupView, onGroupEdit, onGroupDelete) {
-        const swipeContainer = document.createElement('div');
-        swipeContainer.className = 'swipe-container';
-        swipeContainer.dataset.id = group.id;
+        const groupElement = document.createElement('div');
+        groupElement.className = 'group-item';
+        groupElement.dataset.id = group.id;
 
-        const swipeContent = document.createElement('div');
-        swipeContent.className = 'swipe-content group-item';
-        
-        swipeContent.innerHTML = `
-            <div class="group-header">
-                <div>
-                    <div class="group-title">${group.schoolName}</div>
-                    ${group.campus ? `<div class="group-campus">${group.campus}</div>` : ''}
-                    <div class="group-admin">Admin: ${group.adminName}</div>
-                </div>
-                <div class="group-stats">
-                    <span>${group.sessionCount} sessions</span>
-                </div>
+        // Check if this group is selected
+        const isSelected = this.selectedGroups.has(group.id);
+        if (isSelected) {
+            groupElement.classList.add('selected');
+        }
+
+        groupElement.innerHTML = `
+            <div class="group-item-checkbox">
+                <input type="checkbox" class="group-checkbox" data-group-id="${group.id}" ${isSelected ? 'checked' : ''}>
             </div>
-            <div class="group-details">
-                ${group.adminPhone ? `
-                    <div class="group-phone">
-                        <span class="icon">📞</span>
-                        ${group.adminPhone}
+            <div class="group-item-content">
+                <div class="group-header">
+                    <div>
+                        <div class="group-title">${group.schoolName}</div>
+                        ${group.campus ? `<div class="group-campus">${group.campus}</div>` : ''}
+                        <div class="group-admin">Admin: ${group.adminName}</div>
                     </div>
-                ` : ''}
-                ${group.schoolAddress ? `
-                    <div class="group-address">
-                        <span class="icon">📍</span>
-                        ${group.schoolAddress}
+                    <div class="group-stats">
+                        <span>${group.sessionCount} sessions</span>
                     </div>
-                ` : ''}
+                </div>
+                <div class="group-details">
+                    ${group.adminPhone ? `
+                        <div class="group-phone">
+                            <span class="icon">📞</span>
+                            ${group.adminPhone}
+                        </div>
+                    ` : ''}
+                    ${group.schoolAddress ? `
+                        <div class="group-address">
+                            <span class="icon">📍</span>
+                            ${group.schoolAddress}
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="group-actions">
+                    <button class="btn btn-ghost btn-small group-view-btn" data-id="${group.id}">
+                        <span class="btn-icon">👁️</span>
+                        View
+                    </button>
+                    <button class="btn btn-ghost btn-small group-edit-btn" data-id="${group.id}">
+                        <span class="btn-icon">✏️</span>
+                        Edit
+                    </button>
+                    <button class="btn btn-danger btn-small group-delete-btn" data-id="${group.id}">
+                        <span class="btn-icon">🗑️</span>
+                        Delete
+                    </button>
+                </div>
             </div>
         `;
 
-        const swipeActions = document.createElement('div');
-        swipeActions.className = 'swipe-actions';
-        swipeActions.innerHTML = `
-            <button class="swipe-action edit" data-id="${group.id}">
-                <span class="btn-icon">✏️</span>
-                Edit
-            </button>
-            <button class="swipe-action delete" data-id="${group.id}">
-                <span class="btn-icon">🗑️</span>
-                Delete
-            </button>
-        `;
+        // Checkbox event
+        const checkbox = groupElement.querySelector('.group-checkbox');
+        checkbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            this.toggleGroupSelection(group.id, checkbox.checked);
+            groupElement.classList.toggle('selected', checkbox.checked);
+        });
 
-        swipeContainer.appendChild(swipeContent);
-        swipeContainer.appendChild(swipeActions);
-
-        // Improved swipe functionality
-        this.setupSwipe(swipeContainer, swipeContent, swipeActions);
+        // Add event listeners for action buttons
+        const viewBtn = groupElement.querySelector('.group-view-btn');
+        const editBtn = groupElement.querySelector('.group-edit-btn');
+        const deleteBtn = groupElement.querySelector('.group-delete-btn');
         
-        // Click to view group (only if not swiping)
-        if (onGroupView) {
-            swipeContent.addEventListener('click', (e) => {
-                if (!swipeContainer.classList.contains('swiped')) {
-                    console.log('Group view clicked:', group.id);
-                    onGroupView(group.id);
-                }
+        if (viewBtn && onGroupView) {
+            viewBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                onGroupView(group.id);
             });
         }
         
-        // Edit button event
-        swipeActions.querySelector('.swipe-action.edit').addEventListener('click', (e) => {
-            e.stopPropagation();
-            console.log('Edit group clicked:', group.id);
-            onGroupEdit(group.id);
-        });
+        if (editBtn && onGroupEdit) {
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                onGroupEdit(group.id);
+            });
+        }
 
-        // Delete button event
-        swipeActions.querySelector('.swipe-action.delete').addEventListener('click', (e) => {
-            e.stopPropagation();
-            console.log('Delete group clicked:', group.id);
-            onGroupDelete(group.id);
-        });
+        if (deleteBtn && onGroupDelete) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                onGroupDelete(group.id);
+            });
+        }
 
-        return swipeContainer;
+        return groupElement;
     }
 
-    setupSwipe(container, content, actions) {
-        let startX = 0;
-        let currentX = 0;
-        let isSwiping = false;
-        let swipeDistance = 0;
+    // Selection management for bulk operations
+    toggleGroupSelection(groupId, isSelected) {
+        console.log('Toggle group selection:', groupId, isSelected);
+        if (isSelected) {
+            this.selectedGroups.add(groupId);
+        } else {
+            this.selectedGroups.delete(groupId);
+        }
+        this.updateGroupsBulkActionsUI();
+    }
 
-        const handleTouchStart = (e) => {
-            startX = e.touches[0].clientX;
-            isSwiping = true;
-            content.style.transition = 'none';
-            actions.style.transition = 'none';
-        };
+    selectAllGroups() {
+        console.log('Selecting all groups');
+        this.groups.forEach(group => {
+            this.selectedGroups.add(group.id);
+        });
+        this.updateGroupCheckboxes();
+        this.updateGroupsBulkActionsUI();
+    }
 
-        const handleTouchMove = (e) => {
-            if (!isSwiping) return;
-            
-            currentX = e.touches[0].clientX;
-            swipeDistance = startX - currentX;
-            
-            if (swipeDistance > 0) { // Swiping left
-                e.preventDefault();
-                const translateX = Math.min(swipeDistance, 160);
-                content.style.transform = `translateX(-${translateX}px)`;
-                actions.style.transform = `translateX(${translateX - 160}px)`;
-            } else if (swipeDistance < -10) { // Swiping right - close actions
-                container.classList.remove('swiped');
-                content.style.transform = 'translateX(0)';
-                actions.style.transform = 'translateX(100%)';
-            }
-        };
+    deselectAllGroups() {
+        console.log('Deselecting all groups');
+        this.selectedGroups.clear();
+        this.updateGroupCheckboxes();
+        this.updateGroupsBulkActionsUI();
+    }
 
-        const handleTouchEnd = () => {
-            if (!isSwiping) return;
-            
-            content.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
-            actions.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
-            
-            if (swipeDistance > 60) { // Swipe threshold
-                container.classList.add('swiped');
-                content.style.transform = 'translateX(-160px)';
-                actions.style.transform = 'translateX(0)';
+    updateGroupCheckboxes() {
+        document.querySelectorAll('.group-checkbox').forEach(checkbox => {
+            const groupId = checkbox.dataset.groupId;
+            checkbox.checked = this.selectedGroups.has(groupId);
+            checkbox.closest('.group-item')?.classList.toggle('selected', checkbox.checked);
+        });
+    }
+
+    updateGroupsBulkActionsUI() {
+        const selectedCount = this.selectedGroups.size;
+        const bulkActionsToolbar = document.getElementById('groupsBulkActionsToolbar');
+        const selectedCountElement = document.getElementById('groupsSelectedCount');
+        const bulkEditBtn = document.getElementById('groupsBulkEditBtn');
+        const bulkDeleteBtn = document.getElementById('groupsBulkDeleteBtn');
+
+        console.log('Updating groups bulk actions UI. Selected count:', selectedCount);
+
+        if (bulkActionsToolbar && selectedCountElement) {
+            if (selectedCount > 0) {
+                bulkActionsToolbar.style.display = 'flex';
+                selectedCountElement.textContent = `${selectedCount} selected`;
+                
+                // Enable/disable edit button based on selection count
+                if (bulkEditBtn) {
+                    bulkEditBtn.disabled = selectedCount !== 1;
+                }
+
+                // Enable delete button
+                if (bulkDeleteBtn) {
+                    bulkDeleteBtn.disabled = false;
+                }
             } else {
-                container.classList.remove('swiped');
-                content.style.transform = 'translateX(0)';
-                actions.style.transform = 'translateX(100%)';
+                bulkActionsToolbar.style.display = 'none';
             }
-            
-            isSwiping = false;
-            swipeDistance = 0;
-        };
-
-        content.addEventListener('touchstart', handleTouchStart);
-        content.addEventListener('touchmove', handleTouchMove);
-        content.addEventListener('touchend', handleTouchEnd);
-
-        // Close swipe when clicking outside
-        document.addEventListener('touchstart', (e) => {
-            if (!container.contains(e.target)) {
-                container.classList.remove('swiped');
-                content.style.transform = 'translateX(0)';
-                actions.style.transform = 'translateX(100%)';
-            }
-        });
+        }
     }
 
+    getSelectedGroups() {
+        return Array.from(this.selectedGroups).map(groupId => 
+            this.groups.find(g => g.id === groupId)
+        ).filter(Boolean);
+    }
+
+    deleteSelectedGroups() {
+        console.log('Deleting selected groups. Count:', this.selectedGroups.size);
+        const selectedGroups = this.getSelectedGroups();
+        console.log('Selected groups to delete:', selectedGroups);
+        
+        selectedGroups.forEach(group => {
+            console.log('Deleting group:', group.schoolName);
+            this.deleteGroup(group.id, true);
+        });
+        
+        const deletedCount = selectedGroups.length;
+        this.selectedGroups.clear();
+        this.updateGroupsBulkActionsUI();
+        
+        console.log('Deleted groups count:', deletedCount);
+        return deletedCount;
+    }
+
+    // FIXED: Trash list rendering
     renderTrashList(sessionsContainer, groupsContainer, onRestore, onPermanentDelete) {
         const trashSessions = this.trash.filter(item => item.originalType === 'session');
         const trashGroups = this.trash.filter(item => item.originalType === 'group');
@@ -467,19 +535,24 @@ class GroupsManager {
             : `Admin: ${item.adminName} • ${new Date(item.deletedAt).toLocaleDateString()}`;
 
         element.innerHTML = `
-            <div class="trash-item-info">
-                <div class="trash-item-title">${title}</div>
-                <div class="trash-item-meta">${meta}</div>
+            <div class="trash-item-checkbox">
+                <input type="checkbox" class="trash-checkbox" data-trash-id="${item.trashId}">
             </div>
-            <div class="trash-item-actions">
-                <button class="btn btn-ghost btn-small restore-btn" data-trash-id="${item.trashId}">
-                    <span class="btn-icon">↶</span>
-                    Restore
-                </button>
-                <button class="btn btn-danger btn-small delete-permanent-btn" data-trash-id="${item.trashId}">
-                    <span class="btn-icon">×</span>
-                    Delete
-                </button>
+            <div class="trash-item-content">
+                <div class="trash-item-info">
+                    <div class="trash-item-title">${title}</div>
+                    <div class="trash-item-meta">${meta}</div>
+                </div>
+                <div class="trash-item-actions">
+                    <button class="btn btn-ghost btn-small restore-btn" data-trash-id="${item.trashId}">
+                        <span class="btn-icon">↶</span>
+                        Restore
+                    </button>
+                    <button class="btn btn-danger btn-small delete-permanent-btn" data-trash-id="${item.trashId}">
+                        <span class="btn-icon">×</span>
+                        Delete
+                    </button>
+                </div>
             </div>
         `;
 
@@ -491,7 +564,9 @@ class GroupsManager {
             restoreBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 console.log('Restore button clicked for trashId:', item.trashId);
-                onRestore(item.trashId, item.originalType);
+                if (onRestore) {
+                    onRestore(item.trashId, item.originalType);
+                }
             });
         }
         
@@ -499,7 +574,9 @@ class GroupsManager {
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 console.log('Delete button clicked for trashId:', item.trashId);
-                onPermanentDelete(item.trashId, item.originalType);
+                if (onPermanentDelete) {
+                    onPermanentDelete(item.trashId, item.originalType);
+                }
             });
         }
 
@@ -564,24 +641,34 @@ class GroupsManager {
         );
     }
 
-    loadGroups() {
-        try {
-            const saved = localStorage.getItem('teacher_notes_groups');
-            return saved ? JSON.parse(saved) : [];
-        } catch (error) {
-            console.error('Error loading groups:', error);
-            return [];
-        }
-    }
-
     saveGroups() {
-        try {
-            localStorage.setItem('teacher_notes_groups', JSON.stringify(this.groups));
-        } catch (error) {
-            console.error('Error saving groups:', error);
-        }
+    try {
+        console.log('=== DEBUG: Saving Groups ===');
+        console.log('Groups to save:', this.groups.length);
+        console.log('Groups data:', this.groups);
+        
+        localStorage.setItem('teacher_notes_groups', JSON.stringify(this.groups));
+        console.log('Groups saved successfully');
+    } catch (error) {
+        console.error('Error saving groups:', error);
     }
+}
 
+loadGroups() {
+    try {
+        const saved = localStorage.getItem('teacher_notes_groups');
+        console.log('=== DEBUG: Loading Groups ===');
+        console.log('Raw saved data:', saved);
+        
+        const groups = saved ? JSON.parse(saved) : [];
+        console.log('Parsed groups:', groups.length);
+        
+        return groups;
+    } catch (error) {
+        console.error('Error loading groups:', error);
+        return [];
+    }
+}
     loadTrash() {
         try {
             const saved = localStorage.getItem('teacher_notes_trash');

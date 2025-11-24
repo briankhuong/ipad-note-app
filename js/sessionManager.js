@@ -2,6 +2,7 @@ class SessionManager {
   constructor() {
     this.currentSession = null;
     this.sessions = this.loadSessions();
+    this.selectedSessions = new Set(); // Track selected sessions for bulk operations
   }
 
   createSession(school, campus, teacher, date, unit, lesson) {
@@ -38,13 +39,21 @@ class SessionManager {
     console.log('Session saved:', this.currentSession);
   }
 
-  saveIndicatorNotes(indicatorId, drawingData, performanceType = null, autoComment = false) {
+  saveIndicatorNotes(indicatorId, drawingData, performanceType = null, autoComment = false) { // FIXED: explicit null default
     if (!this.currentSession) return;
     
-    // FIXED: Don't save if all fields are empty/null/false
+    // FIXED: Explicit check for null/undefined, not falsy
     const hasDrawing = drawingData && drawingData.length > 0;
-    const hasPerformance = !!performanceType;
+    const hasPerformance = performanceType !== null && performanceType !== undefined;
     const hasAutoComment = !!autoComment;
+    
+    console.log(`Saving notes for ${indicatorId}:`, {
+        hasDrawing,
+        hasPerformance,
+        performanceType, // This should be null if not set
+        hasAutoComment
+    });
+    
     if (!hasDrawing && !hasPerformance && !hasAutoComment) {
         // Remove entry if exists and now empty
         if (this.currentSession.indicators[indicatorId]) {
@@ -56,14 +65,14 @@ class SessionManager {
     }
     
     this.currentSession.indicators[indicatorId] = {
-      drawingData: drawingData,
-      performanceType: performanceType,
-      autoComment: autoComment,
-      savedAt: new Date().toISOString()
+        drawingData: drawingData,
+        performanceType: performanceType, // FIXED: Can be null
+        autoComment: autoComment,
+        savedAt: new Date().toISOString()
     };
     this.saveCurrentSession();
     console.log(`Notes saved for ${indicatorId}:`, this.currentSession.indicators[indicatorId]);
-  }
+}
 
   getIndicatorNotes(indicatorId) {
     if (!this.currentSession || !this.currentSession.indicators[indicatorId]) {
@@ -94,6 +103,9 @@ class SessionManager {
       if (this.currentSession && this.currentSession.id === sessionId) {
         this.currentSession = null;
       }
+      // Remove from selected sessions if it was selected
+      this.selectedSessions.delete(sessionId);
+      this.updateBulkActionsUI();
       return true;
     }
     return false;
@@ -287,10 +299,19 @@ class SessionManager {
     }
   }
 
-  renderSessionsList(container, onSessionSelect, onSessionEdit, onSessionDelete, filters = {}) {
-    console.log('Rendering sessions list with filters:', filters);
+  renderSessionsList(container, onSessionSelect, onSessionEdit, onSessionDelete, filters = {}, sortOptions = {}) {
+    console.log('Rendering sessions list with filters:', filters, 'and sort options:', sortOptions);
     container.innerHTML = '';
-    const sessionsToRender = filters && Object.keys(filters).length > 0 ? this.filterSessions(filters) : this.sessions;
+    
+    let sessionsToRender = filters && Object.keys(filters).length > 0 ? 
+      this.filterSessions(filters) : 
+      [...this.sessions];
+
+    // Apply sorting
+    sessionsToRender = this.sortSessions(sessionsToRender, sortOptions);
+
+    // Apply grouping
+    const groupedSessions = this.groupSessions(sessionsToRender, sortOptions.groupBy);
 
     if (sessionsToRender.length === 0) {
       const emptyState = document.getElementById('emptySessionsState');
@@ -305,147 +326,249 @@ class SessionManager {
     if (emptyState) {
       emptyState.style.display = 'none';
     }
-    container.style.display = 'grid';
+    container.style.display = 'block';
 
-    sessionsToRender.forEach(session => {
-      const sessionElement = this.createSessionElement(session, onSessionSelect, onSessionEdit, onSessionDelete);
-      container.appendChild(sessionElement);
+    // Render grouped or ungrouped sessions
+    if (sortOptions.groupBy && sortOptions.groupBy !== 'none') {
+      this.renderGroupedSessions(container, groupedSessions, onSessionSelect, onSessionEdit, onSessionDelete);
+    } else {
+      sessionsToRender.forEach(session => {
+        const sessionElement = this.createSessionElement(session, onSessionSelect, onSessionEdit, onSessionDelete);
+        container.appendChild(sessionElement);
+      });
+    }
+  }
+
+  renderGroupedSessions(container, groupedSessions, onSessionSelect, onSessionEdit, onSessionDelete) {
+    Object.entries(groupedSessions).forEach(([groupName, sessions]) => {
+      // Create group header
+      const groupHeader = document.createElement('div');
+      groupHeader.className = 'session-group-header';
+      groupHeader.innerHTML = `
+        <span>${groupName}</span>
+        <span class="session-group-count">${sessions.length} session${sessions.length !== 1 ? 's' : ''}</span>
+      `;
+      container.appendChild(groupHeader);
+
+      // Render sessions in this group
+      sessions.forEach(session => {
+        const sessionElement = this.createSessionElement(session, onSessionSelect, onSessionEdit, onSessionDelete);
+        container.appendChild(sessionElement);
+      });
     });
   }
 
+  groupSessions(sessions, groupBy) {
+    if (!groupBy || groupBy === 'none') {
+      return sessions;
+    }
+
+    const grouped = {};
+
+    sessions.forEach(session => {
+      let groupKey;
+
+      switch (groupBy) {
+        case 'school':
+          groupKey = session.school || 'Unknown School';
+          break;
+        case 'date':
+          groupKey = new Date(session.createdAt).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+          break;
+        case 'unit':
+          groupKey = `Unit ${session.unit}`;
+          break;
+        default:
+          groupKey = 'Other';
+      }
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = [];
+      }
+      grouped[groupKey].push(session);
+    });
+
+    return grouped;
+  }
+
+  sortSessions(sessions, sortOptions) {
+    const sortedSessions = [...sessions];
+
+    sortedSessions.sort((a, b) => {
+      let aValue, bValue;
+
+      switch (sortOptions.sortBy) {
+        case 'date':
+          aValue = new Date(a.createdAt);
+          bValue = new Date(b.createdAt);
+          break;
+        case 'teacher':
+          aValue = a.teacher.toLowerCase();
+          bValue = b.teacher.toLowerCase();
+          break;
+        case 'school':
+          aValue = a.school.toLowerCase();
+          bValue = b.school.toLowerCase();
+          break;
+        case 'unit':
+          aValue = parseInt(a.unit) || 0;
+          bValue = parseInt(b.unit) || 0;
+          break;
+        default:
+          aValue = new Date(a.createdAt);
+          bValue = new Date(b.createdAt);
+      }
+
+      if (sortOptions.sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    return sortedSessions;
+  }
+
   createSessionElement(session, onSessionSelect, onSessionEdit, onSessionDelete) {
-  const swipeContainer = document.createElement('div');
-  swipeContainer.className = 'swipe-container';
-  swipeContainer.dataset.id = session.id;
+    const sessionElement = document.createElement('div');
+    sessionElement.className = 'session-card';
+    sessionElement.dataset.id = session.id;
 
-  const swipeContent = document.createElement('div');
-  swipeContent.className = 'swipe-content session-card';
+    // Count only indicators with actual notes
+    const notesCount = Object.entries(session.indicators || {}).filter(([_, notes]) => {
+      return notes && ((notes.drawingData && notes.drawingData.length > 0) || notes.performanceType || notes.autoComment);
+    }).length;
 
-  // Count only indicators with actual notes (drawing data or performance type or autoComment)
-  const notesCount = Object.entries(session.indicators || {}).filter(([_, notes]) => {
-    return notes && ((notes.drawingData && notes.drawingData.length > 0) || notes.performanceType || notes.autoComment);
-  }).length;
+    const progress = Math.round((notesCount / 18) * 100);
 
-  const progress = Math.round((notesCount / 18) * 100);
-
-  swipeContent.innerHTML = `
-    <h3><strong>${session.teacher}</strong></h3>
-    <p class="session-meta">
-      ${session.school}${session.campus ? ` · ${session.campus}` : ''}<br>
-      Unit ${session.unit} · Lesson ${session.lesson}<br>
-      ${new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-    </p>
-    <div class="session-stats">
-      <div class="progress-info">
-        <span>${notesCount} of 18 indicators</span>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width: ${progress}%"></div>
+    sessionElement.innerHTML = `
+      <div class="session-card-checkbox">
+        <input type="checkbox" class="session-checkbox" data-session-id="${session.id}">
+      </div>
+      <div class="session-card-content">
+        <h3><strong>${session.teacher}</strong></h3>
+        <p class="session-meta">
+          ${session.school}${session.campus ? ` · ${session.campus}` : ''}<br>
+          Unit ${session.unit} · Lesson ${session.lesson}<br>
+          ${new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </p>
+        <div class="session-stats">
+          <div class="progress-info">
+            <span>${notesCount} of 18 indicators</span>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${progress}%"></div>
+            </div>
+          </div>
+          <span class="session-status">${session.status.toUpperCase()}</span>
         </div>
       </div>
-      <span class="session-status">${session.status.toUpperCase()}</span>
-    </div>
-  `;
+    `;
 
-  const swipeActions = document.createElement('div');
-  swipeActions.className = 'swipe-actions';
-  swipeActions.innerHTML = `
-    <div class="swipe-action edit">Edit</div>
-    <div class="swipe-action delete">Delete</div>
-  `;
+    // Checkbox event
+    const checkbox = sessionElement.querySelector('.session-checkbox');
+    checkbox.addEventListener('change', (e) => {
+      e.stopPropagation();
+      this.toggleSessionSelection(session.id, checkbox.checked);
+      sessionElement.classList.toggle('selected', checkbox.checked);
+    });
 
-  swipeContainer.appendChild(swipeContent);
-  swipeContainer.appendChild(swipeActions);
+    // Click to select session (only if not interacting with checkbox)
+    sessionElement.addEventListener('click', (e) => {
+      if (e.target.type !== 'checkbox' && !e.target.closest('.session-card-checkbox')) {
+        onSessionSelect(session.id);
+      }
+    });
 
-  // Click to select session
-  swipeContent.addEventListener('click', (e) => {
-    // Only select if not swiped
-    if (!swipeContainer.classList.contains('swiped')) {
-      console.log('Session selected:', session.id);
-      onSessionSelect(session.id);
+    return sessionElement;
+  }
+
+  // Selection management for bulk operations
+  toggleSessionSelection(sessionId, isSelected) {
+    if (isSelected) {
+      this.selectedSessions.add(sessionId);
+    } else {
+      this.selectedSessions.delete(sessionId);
     }
-  });
+    this.updateBulkActionsUI();
+  }
 
-  // Edit button event
-  swipeActions.querySelector('.swipe-action.edit').addEventListener('click', (e) => {
-    e.stopPropagation();
-    console.log('Edit session clicked:', session.id);
-    swipeContainer.classList.remove('swiped');
-    swipeContent.style.transform = 'translateX(0)';
-    swipeActions.style.transform = 'translateX(100%)';
-    onSessionEdit(session.id);
-  });
+  selectAllSessions() {
+    this.sessions.forEach(session => {
+      this.selectedSessions.add(session.id);
+    });
+    this.updateSessionCheckboxes();
+    this.updateBulkActionsUI();
+  }
 
-  // Delete button event
-  swipeActions.querySelector('.swipe-action.delete').addEventListener('click', (e) => {
-    e.stopPropagation();
-    console.log('Delete session clicked:', session.id);
-    swipeContainer.classList.remove('swiped');
-    swipeContent.style.transform = 'translateX(0)';
-    swipeActions.style.transform = 'translateX(100%)';
-    onSessionDelete(session.id);
-  });
+  deselectAllSessions() {
+    this.selectedSessions.clear();
+    this.updateSessionCheckboxes();
+    this.updateBulkActionsUI();
+  }
 
-  // Setup swipe functionality
-  this.setupSwipe(swipeContainer, swipeContent, swipeActions);
-  return swipeContainer;
-}
+  updateSessionCheckboxes() {
+    document.querySelectorAll('.session-checkbox').forEach(checkbox => {
+      const sessionId = checkbox.dataset.sessionId;
+      checkbox.checked = this.selectedSessions.has(sessionId);
+      checkbox.closest('.session-card')?.classList.toggle('selected', checkbox.checked);
+    });
+  }
 
-  setupSwipe(container, content, actions) {
-    let startX = 0;
-    let currentX = 0;
-    let isSwiping = false;
-    let swipeDistance = 0;
+  updateBulkActionsUI() {
+    const selectedCount = this.selectedSessions.size;
+    const bulkActionsToolbar = document.getElementById('bulkActionsToolbar');
+    const selectedCountElement = document.getElementById('selectedCount');
+    const bulkEditBtn = document.getElementById('bulkEditBtn');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
 
-    const handleTouchStart = (e) => {
-      startX = e.touches[0].clientX;
-      isSwiping = true;
-      swipeDistance = 0;
-      content.style.transition = 'none';
-      actions.style.transition = 'none';
-    };
-
-    const handleTouchMove = (e) => {
-      if (!isSwiping) return;
-      currentX = e.touches[0].clientX;
-      swipeDistance = startX - currentX;
-
-      if (swipeDistance > 0) {
-        // Swiping left
-        e.preventDefault();
-        const translateX = Math.min(swipeDistance, 160);
-        content.style.transform = `translateX(-${translateX}px)`;
-        actions.style.transform = `translateX(-${translateX}px)`;
-      }
-    };
-
-    const handleTouchEnd = () => {
-      isSwiping = false;
-      content.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
-      actions.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
-      if (swipeDistance > 80) {
-        content.style.transform = 'translateX(-160px)';
-        actions.style.transform = 'translateX(-160px)';
-        container.classList.add('swiped');
+    if (bulkActionsToolbar && selectedCountElement) {
+      if (selectedCount > 0) {
+        bulkActionsToolbar.style.display = 'flex';
+        selectedCountElement.textContent = `${selectedCount} selected`;
+        
+        // Enable/disable edit button based on selection count
+        if (bulkEditBtn) {
+          bulkEditBtn.disabled = selectedCount !== 1;
+        }
       } else {
-        content.style.transform = 'translateX(0)';
-        actions.style.transform = 'translateX(100%)';
-        container.classList.remove('swiped');
+        bulkActionsToolbar.style.display = 'none';
       }
-    };
+    }
+  }
 
-    container.addEventListener('touchstart', handleTouchStart);
-    container.addEventListener('touchmove', handleTouchMove);
-    container.addEventListener('touchend', handleTouchEnd);
+  getSelectedSessions() {
+    return Array.from(this.selectedSessions).map(sessionId => 
+      this.sessions.find(s => s.id === sessionId)
+    ).filter(Boolean);
+  }
+
+  deleteSelectedSessions() {
+    const selectedSessions = this.getSelectedSessions();
+    selectedSessions.forEach(session => {
+      this.deleteSession(session.id, true);
+    });
+    this.selectedSessions.clear();
+    return selectedSessions.length;
   }
 
   getSessionProgress(sessionId) {
     const session = this.sessions.find(s => s.id === sessionId);
     if (!session) return 0;
+    
+    // FIXED: Count indicators that have actual content (drawing OR auto-comment)
+    // NOT just performance type
     const notesCount = Object.entries(session.indicators || {}).filter(([_, notes]) => {
-      return (notes.drawingData && notes.drawingData.length > 0) || notes.performanceType || notes.autoComment;
+        const hasDrawing = notes.drawingData && notes.drawingData.length > 0;
+        const hasAutoComment = notes.autoComment;
+        return hasDrawing || hasAutoComment;
     }).length;
+    
     return Math.round((notesCount / 18) * 100);
-  }
+}
 
   getAllSessions() {
     return this.sessions;
@@ -501,5 +624,8 @@ class SessionManager {
       );
     });
   }
-}
 
+  getSessionsCount() {
+    return this.sessions.length;
+  }
+}

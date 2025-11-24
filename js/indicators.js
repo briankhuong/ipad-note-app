@@ -144,126 +144,140 @@ class IndicatorsManager {
     }
 
     createIndicatorElement(indicator, onIndicatorSelect, sessionManager = null) {
-        const indicatorElement = document.createElement('div');
-        indicatorElement.className = 'indicator-item';
-        indicatorElement.dataset.id = indicator.id;
-        
-        // Check for existing notes and performance type
-        let performanceType = null;
-        let autoComment = false;
-        if (sessionManager) {
-            const notes = sessionManager.getIndicatorNotes(indicator.id);
-            if (notes) {
-                performanceType = notes.performanceType;
-                autoComment = notes.autoComment || false;
-                // Only apply if performance type exists
-                if (performanceType) {
-                    const classSuffix = performanceType === 'good' ? 'good-point' : 'growth-area'; // FIXED: Match CSS for growth
-                    indicatorElement.classList.add('has-notes', classSuffix);
-                }
+    const indicatorElement = document.createElement('div');
+    indicatorElement.className = 'indicator-item';
+    indicatorElement.dataset.id = indicator.id;
+    
+    // FIXED: Get current state without defaults
+    let performanceType = null;
+    let hasDrawing = false;
+    let autoComment = false;
+    
+    if (sessionManager) {
+        const notes = sessionManager.getIndicatorNotes(indicator.id);
+        if (notes) {
+            performanceType = notes.performanceType; // Could be null, 'good', or 'growth'
+            hasDrawing = notes.drawingData && notes.drawingData.length > 0;
+            autoComment = notes.autoComment || false;
+            
+            // Only add classes if explicitly set
+            if (performanceType === 'good') {
+                indicatorElement.classList.add('has-notes', 'good-point');
+            } else if (performanceType === 'growth') {
+                indicatorElement.classList.add('has-notes', 'growth-area');
+            } else if (hasDrawing || autoComment) {
+                // Has content but no performance type
+                indicatorElement.classList.add('has-notes');
             }
         }
-        
-        indicatorElement.innerHTML = `
-            <div class="indicator-header">
-                <div class="indicator-id">
-                    ${indicator.id}
-                    ${performanceType ? `<div class="performance-badge ${performanceType}"></div>` : ''}
-                </div>
-                <div class="indicator-controls">
-                    <button class="performance-toggle-btn good ${performanceType === 'good' ? 'active' : ''}" data-type="good" title="Mark as Good Point">
-                        ✓
-                    </button>
-                    <button class="performance-toggle-btn growth ${performanceType === 'growth' ? 'active' : ''}" data-type="growth" title="Mark as Growth Area">
-                        ✗
-                    </button>
-                    <button class="auto-comment-toggle ${autoComment ? 'active' : ''}" title="Auto-add comment">
-                        💬
-                    </button>
-                </div>
+    }
+    
+    indicatorElement.innerHTML = `
+        <div class="indicator-header">
+            <div class="indicator-id">
+                ${indicator.id}
+                ${performanceType ? `<div class="performance-badge ${performanceType}"></div>` : ''}
             </div>
-            <div class="indicator-text">${indicator.indicator}</div>
-        `;
-        
-        // Indicator click handler - Only select, don't auto-mark
-        indicatorElement.addEventListener('click', (e) => {
-            if (!e.target.closest('.indicator-controls')) {
-                onIndicatorSelect(indicator);
+            <div class="indicator-controls">
+                <button class="performance-toggle-btn good ${performanceType === 'good' ? 'active' : ''}" data-type="good" title="Mark as Good Point">
+                    ✓
+                </button>
+                <button class="performance-toggle-btn growth ${performanceType === 'growth' ? 'active' : ''}" data-type="growth" title="Mark as Growth Area">
+                    ✗
+                </button>
+                <button class="auto-comment-toggle ${autoComment ? 'active' : ''}" title="Auto-add comment">
+                    💬
+                </button>
+            </div>
+        </div>
+        <div class="indicator-text">${indicator.indicator}</div>
+    `;
+    
+    // Indicator click handler
+    indicatorElement.addEventListener('click', (e) => {
+        if (!e.target.closest('.indicator-controls')) {
+            onIndicatorSelect(indicator);
+        }
+    });
+    
+    // Performance toggle handlers
+    const goodBtn = indicatorElement.querySelector('.performance-toggle-btn.good');
+    const growthBtn = indicatorElement.querySelector('.performance-toggle-btn.growth');
+    const autoCommentBtn = indicatorElement.querySelector('.auto-comment-toggle');
+    
+    if (goodBtn) {
+        goodBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.handlePerformanceToggle(indicator.id, 'good', sessionManager);
+            this.updatePerformanceUI(indicatorElement, 'good', sessionManager);
+            if (window.app) {
+                window.app.updateIndicatorPerformanceDisplay();
+                window.app.updateProgress();
             }
         });
-        
-        // Performance toggle handlers
-        const goodBtn = indicatorElement.querySelector('.performance-toggle-btn.good');
-        const growthBtn = indicatorElement.querySelector('.performance-toggle-btn.growth');
-        const autoCommentBtn = indicatorElement.querySelector('.auto-comment-toggle');
-        
-        if (goodBtn) {
-            goodBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.handlePerformanceToggle(indicator.id, 'good');
-                this.updatePerformanceUI(indicatorElement, 'good');
-                if (window.app) {
-                    window.app.updateIndicatorPerformanceDisplay();
-                    window.app.updateProgress();
-                }
-            });
-        }
-        
-        if (growthBtn) {
-            growthBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.handlePerformanceToggle(indicator.id, 'growth');
-                this.updatePerformanceUI(indicatorElement, 'growth');
-                if (window.app) {
-                    window.app.updateIndicatorPerformanceDisplay();
-                    window.app.updateProgress();
-                }
-            });
-        }
-        
-        if (autoCommentBtn) {
-            autoCommentBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.handleAutoCommentToggle(indicator);
-                autoCommentBtn.classList.toggle('active');
-                if (window.app) {
-                    window.app.updateProgress();
-                }
-            });
-        }
-        
-        return indicatorElement;
     }
+    
+    if (growthBtn) {
+        growthBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.handlePerformanceToggle(indicator.id, 'growth', sessionManager);
+            this.updatePerformanceUI(indicatorElement, 'growth', sessionManager);
+            if (window.app) {
+                window.app.updateIndicatorPerformanceDisplay();
+                window.app.updateProgress();
+            }
+        });
+    }
+    
+    if (autoCommentBtn) {
+        autoCommentBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.handleAutoCommentToggle(indicator, sessionManager);
+            autoCommentBtn.classList.toggle('active');
+            if (window.app) {
+                window.app.updateProgress();
+            }
+        });
+    }
+    
+    return indicatorElement;
+}
 
-    handlePerformanceToggle(indicatorId, performanceType) {
-        if (!window.app || !window.app.sessionManager) {
-            console.error('App or sessionManager not available');
+    handlePerformanceToggle(indicatorId, performanceType, sessionManager) {
+    if (!sessionManager) {
+        console.error('sessionManager not available');
+        return;
+    }
+    
+    const notes = sessionManager.getIndicatorNotes(indicatorId) || {};
+    const currentDrawingData = notes.drawingData || null;
+    const currentAutoComment = notes.autoComment || false;
+    const currentPerformanceType = notes.performanceType; // Could be null
+    
+    console.log(`Toggling performance for ${indicatorId}:`, {
+        currentPerformanceType,
+        newPerformanceType: performanceType,
+        hasDrawing: !!currentDrawingData,
+        hasAutoComment: currentAutoComment
+    });
+    
+    if (currentPerformanceType === performanceType) {
+        // Toggle off - remove performance type but keep other data
+        sessionManager.saveIndicatorNotes(indicatorId, currentDrawingData, null, currentAutoComment);
+        console.log(`Removed ${performanceType} from indicator ${indicatorId}`);
+    } else {
+        // Toggle on - set performance type
+        sessionManager.saveIndicatorNotes(indicatorId, currentDrawingData, performanceType, currentAutoComment);
+        console.log(`Set ${performanceType} for indicator ${indicatorId}`);
+    }
+}
+
+    handleAutoCommentToggle(indicator, sessionManager) {
+        if (!sessionManager) {
+            console.error('sessionManager not available');
             return;
         }
         
-        const sessionManager = window.app.sessionManager;
-        const notes = sessionManager.getIndicatorNotes(indicatorId) || {};
-        const currentDrawingData = notes.drawingData || null;
-        const currentAutoComment = notes.autoComment || false;
-        
-        if (notes.performanceType === performanceType) {
-            // Toggle off
-            sessionManager.saveIndicatorNotes(indicatorId, currentDrawingData, null, currentAutoComment);
-            console.log(`Removed ${performanceType} from indicator ${indicatorId}`);
-        } else {
-            // Toggle on
-            sessionManager.saveIndicatorNotes(indicatorId, currentDrawingData, performanceType, currentAutoComment);
-            console.log(`Set ${performanceType} for indicator ${indicatorId}`);
-        }
-    }
-
-    handleAutoCommentToggle(indicator) {
-        if (!window.app || !window.app.sessionManager) {
-            console.error('App or sessionManager not available');
-            return;
-        }
-        
-        const sessionManager = window.app.sessionManager;
         const notes = sessionManager.getIndicatorNotes(indicator.id) || {};
         const currentDrawingData = notes.drawingData || null;
         const currentPerformanceType = notes.performanceType || null;
@@ -285,7 +299,7 @@ class IndicatorsManager {
         }
     }
 
-    updatePerformanceUI(indicatorElement, performanceType) {
+    updatePerformanceUI(indicatorElement, performanceType, sessionManager) {
         const goodBtn = indicatorElement.querySelector('.performance-toggle-btn.good');
         const growthBtn = indicatorElement.querySelector('.performance-toggle-btn.growth');
         const performanceBadge = indicatorElement.querySelector('.performance-badge');
@@ -297,12 +311,12 @@ class IndicatorsManager {
         
         const indicatorId = indicatorElement.dataset.id;
         
-        if (!window.app || !window.app.sessionManager) return;
+        if (!sessionManager) return;
         
-        const notes = window.app.sessionManager.getIndicatorNotes(indicatorId);
+        const notes = sessionManager.getIndicatorNotes(indicatorId);
         
         if (notes && notes.performanceType) {
-            const classSuffix = notes.performanceType === 'good' ? 'good-point' : 'growth-area'; // FIXED: Match CSS
+            const classSuffix = notes.performanceType === 'good' ? 'good-point' : 'growth-area';
             indicatorElement.classList.add('has-notes', classSuffix);
             
             if (notes.performanceType === 'good') {
@@ -356,29 +370,31 @@ class IndicatorsManager {
     }
 
     getPerformanceStats(sessionManager) {
-        if (!sessionManager || !sessionManager.currentSession) {
-            return { good: 0, growth: 0, total: 0 };
-        }
-        
-        const indicators = sessionManager.currentSession.indicators;
-        let goodCount = 0;
-        let growthCount = 0;
-        let total = 0;
-        
-        Object.values(indicators).forEach(note => {
-            // FIXED: Only count if has actual content
-            const hasContent = (note.drawingData && note.drawingData.length > 0) || note.performanceType || note.autoComment;
-            if (hasContent) {
-                total++;
-                if (note.performanceType === 'good') goodCount++;
-                if (note.performanceType === 'growth') growthCount++;
-            }
-        });
-        
-        return {
-            good: goodCount,
-            growth: growthCount,
-            total: total
-        };
+    if (!sessionManager || !sessionManager.currentSession) {
+        return { good: 0, growth: 0, total: 0 };
     }
+    
+    const indicators = sessionManager.currentSession.indicators;
+    let goodCount = 0;
+    let growthCount = 0;
+    let total = 0;
+    
+    Object.values(indicators).forEach(note => {
+        // FIXED: Count if has drawing data OR auto-comment
+        const hasDrawing = note.drawingData && note.drawingData.length > 0;
+        const hasAutoComment = note.autoComment;
+        
+        if (hasDrawing || hasAutoComment) {
+            total++;
+            if (note.performanceType === 'good') goodCount++;
+            if (note.performanceType === 'growth') growthCount++;
+        }
+    });
+    
+    return {
+        good: goodCount,
+        growth: growthCount,
+        total: total
+    };
+}
 }

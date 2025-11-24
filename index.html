@@ -28,11 +28,50 @@
             <!-- Sessions Tab -->
             <div id="sessionsTab" class="tab-content active">
                 <div class="section-header">
-                    <h2 class="section-title">Observation Sessions</h2>
-                    <div class="session-count" id="sessionsCount">0 sessions</div>
+                    <div class="section-title-container">
+                        <h2 class="section-title">Observation Sessions</h2>
+                        <div class="session-count" id="sessionsCount">0 sessions</div>
+                    </div>
+                    <div class="section-controls">
+                        <!-- Bulk Actions Toolbar (Hidden by default) -->
+                        <div id="bulkActionsToolbar" class="bulk-actions-toolbar" style="display: none;">
+                            <span id="selectedCount" class="selected-count">0 selected</span>
+                            <button id="bulkEditBtn" class="btn btn-ghost btn-small" disabled>
+                                <span class="btn-icon">✏️</span>
+                                Edit
+                            </button>
+                            <button id="bulkDeleteBtn" class="btn btn-danger btn-small">
+                                <span class="btn-icon">🗑️</span>
+                                Delete
+                            </button>
+                            <button id="cancelSelection" class="btn btn-ghost btn-small">
+                                <span class="btn-icon">×</span>
+                                Cancel
+                            </button>
+                        </div>
+                        
+                        <!-- Sorting Controls -->
+                        <div class="sorting-controls">
+                            <select id="groupBySelect" class="sort-select">
+                                <option value="none">Group by: None</option>
+                                <option value="school">Group by: School</option>
+                                <option value="date">Group by: Date Created</option>
+                                <option value="unit">Group by: Unit Number</option>
+                            </select>
+                            <select id="sortBySelect" class="sort-select">
+                                <option value="date-desc">Newest First</option>
+                                <option value="date-asc">Oldest First</option>
+                                <option value="teacher-asc">Teacher A-Z</option>
+                                <option value="teacher-desc">Teacher Z-A</option>
+                                <option value="school-asc">School A-Z</option>
+                                <option value="school-desc">School Z-A</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
+
                 <div id="sessionsContainer" class="sessions-grid">
-                    <!-- Sessions will be loaded here -->
+                    <!-- Sessions will be loaded here with checkboxes -->
                 </div>
                 <div id="emptySessionsState" class="empty-state" style="display: none;">
                     <h3>No observations yet</h3>
@@ -44,11 +83,32 @@
             <!-- Groups Tab -->
             <div id="groupsTab" class="tab-content">
                 <div class="section-header">
-                    <h2 class="section-title">School Groups</h2>
-                    <div class="group-count" id="groupsCount">0 groups</div>
+                    <div class="section-title-container">
+                        <h2 class="section-title">School Groups</h2>
+                        <div class="group-count" id="groupsCount">0 groups</div>
+                    </div>
+                    <div class="section-controls">
+                        <!-- Bulk Actions Toolbar for Groups (Hidden by default) -->
+                        <div id="groupsBulkActionsToolbar" class="bulk-actions-toolbar" style="display: none;">
+                            <span id="groupsSelectedCount" class="selected-count">0 selected</span>
+                            <button id="groupsBulkEditBtn" class="btn btn-ghost btn-small" disabled>
+                                <span class="btn-icon">✏️</span>
+                                Edit
+                            </button>
+                            <button id="groupsBulkDeleteBtn" class="btn btn-danger btn-small">
+                                <span class="btn-icon">🗑️</span>
+                                Delete
+                            </button>
+                            <button id="groupsCancelSelection" class="btn btn-ghost btn-small">
+                                <span class="btn-icon">×</span>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
                 <div id="groupsContainer" class="groups-grid">
-                    <!-- Groups will be loaded here -->
+                    <!-- Groups will be loaded here with checkboxes -->
                 </div>
                 <div id="emptyGroupsState" class="empty-state" style="display: none;">
                     <h3>No school groups yet</h3>

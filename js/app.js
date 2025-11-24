@@ -1,43 +1,47 @@
 class App {
     constructor() {
-        this.sessionManager = new SessionManager();
-        this.groupsManager = new GroupsManager();
-        this.indicatorsManager = new IndicatorsManager();
-        this.drawingCanvas = new DrawingCanvas('noteCanvas');
+    this.sessionManager = new SessionManager();
+    this.groupsManager = new GroupsManager();
+    this.indicatorsManager = new IndicatorsManager();
+    this.drawingCanvas = new DrawingCanvas('noteCanvas');
+
+    // Make groupsManager globally available for sessionManager
+    window.groupsManager = this.groupsManager;
+    window.app = this; // Global reference for indicators
     
-        
-        // Make groupsManager globally available for sessionManager
-        window.groupsManager = this.groupsManager;
-        window.app = this; // Global reference for indicators
-        
-        // New state variables
-        this.isSidebarCollapsed = false;
-        this.globalFilterMode = 'all'; // 'all', 'good', 'growth'
-        this.currentFilters = {};
-        this.confirmedAction = null;
-        this.confirmedActionData = null;
-        
-        this.setupEventListeners();
+    // New state variables
+    this.isSidebarCollapsed = false;
+    this.globalFilterMode = 'all'; // 'all', 'good', 'growth'
+    this.currentFilters = {};
+    this.confirmedAction = null;
+    this.confirmedActionData = null;
+    
+    // FIXED: Check if elements exist before setting up
+    this.setupEventListeners();
+    
+    // FIXED: Only call these if we're on dashboard
+    if (document.getElementById('dashboard')) {
         this.showDashboard();
         this.updateCounts();
-        
-        // Set up drawing save callback
-        this.drawingCanvas.setOnSaveCallback((indicatorId, drawingData, performanceType) => {
-            this.sessionManager.saveIndicatorNotes(indicatorId, drawingData, performanceType);
-            this.updateProgress();
-            this.updateIndicatorPerformanceDisplay();
-        });
-
-        this.editingSessionId = null;
-        this.editingGroupId = null;
-        this.currentGroupId = null;
-        
-        
-     /*       
-    this.initializeSidebarToggle(); // ADD THIS LINE
-    this.setupCollapseButton();     // ADD THIS LINE
-    */
     }
+    
+    // Set up drawing save callback - FIXED: Check if drawingCanvas exists
+    if (this.drawingCanvas && this.drawingCanvas.setOnSaveCallback) {
+    this.drawingCanvas.setOnSaveCallback((indicatorId, drawingData, performanceType) => {
+        // FIXED: Pass the current performance type (could be null)
+        const currentNotes = this.sessionManager.getIndicatorNotes(indicatorId);
+        const currentPerformanceType = currentNotes ? currentNotes.performanceType : null;
+        
+        this.sessionManager.saveIndicatorNotes(indicatorId, drawingData, currentPerformanceType);
+        this.updateProgress();
+        this.updateIndicatorPerformanceDisplay();
+    });
+}
+
+    this.editingSessionId = null;
+    this.editingGroupId = null;
+    this.currentGroupId = null;
+}
 
     setupEventListeners() {
         // Dashboard tabs
@@ -74,15 +78,28 @@ class App {
             this.hideNewSessionModal();
         });
 
+        // FIXED: Create First Session button
+        document.getElementById('createFirstSession').addEventListener('click', () => {
+            this.showNewSessionModal();
+        });
+
         // New group modal events
         document.getElementById('newGroupForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (this.editingGroupId) {
-                this.updateGroup(this.editingGroupId);
-            } else {
-                this.createNewGroup();
-            }
-        });
+    e.preventDefault();
+    console.log('=== DEBUG: Form Submit Triggered ===');
+    console.log('Editing Group ID:', this.editingGroupId);
+    
+    // Debug form values before processing
+    const schoolNameInput = document.getElementById('groupName');
+    const adminNameInput = document.getElementById('adminName');
+    console.log('Form values at submit - School:', schoolNameInput?.value, 'Admin:', adminNameInput?.value);
+    
+    if (this.editingGroupId) {
+        this.updateGroup(this.editingGroupId);
+    } else {
+        this.createNewGroup();
+    }
+});
         
         document.querySelectorAll('.close-group-modal').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -209,7 +226,7 @@ class App {
             });
         }
 
-        // Group view events - FIX: Setup back button properly
+        // Group view events
         this.setupGroupViewBackButton();
         
         const newSessionForGroup = document.getElementById('newSessionForGroup');
@@ -238,36 +255,24 @@ class App {
             });
         }
 
-        // Filter events
-        const applyFilters = document.getElementById('applyFilters');
-        if (applyFilters) {
-            applyFilters.addEventListener('click', () => {
-                this.applyFilters();
-            });
-        }
-
-        const clearFilters = document.getElementById('clearFilters');
-        if (clearFilters) {
-            clearFilters.addEventListener('click', () => {
-                this.clearFilters();
-            });
-        }
-
         // Window resize handler for responsive design
         window.addEventListener('resize', () => {
             this.handleResize();
         });
 
-        // Search functionality
-        this.setupSearchFunctionality();
+        // Bulk operations for sessions
+        this.setupBulkOperations();
+
+        // Bulk operations for groups
+        this.setupGroupsBulkOperations();
+
+        // Sorting controls
+        this.setupSortingControls();
     }
 
-    // FIX 1: Back button in group view
     setupGroupViewBackButton() {
-        // Group view events - FIX: Back button
         const backToGroups = document.getElementById('backToGroups');
         if (backToGroups) {
-            // Remove and re-add to ensure clean event listener
             const newBackBtn = backToGroups.cloneNode(true);
             backToGroups.parentNode.replaceChild(newBackBtn, backToGroups);
             
@@ -278,171 +283,146 @@ class App {
         }
     }
 
-    setupSearchFunctionality() {
-        // Create search input for sessions tab
-        const sessionsHeader = document.querySelector('#sessionsTab .section-header');
-        
-        if (!sessionsHeader) {
-            console.error('Sessions header not found');
-            return;
-        }
-
-        // Create filter toggle button
-        const filterToggle = document.createElement('button');
-        filterToggle.id = 'toggleFilters';
-        filterToggle.className = 'btn btn-ghost btn-with-icon';
-        filterToggle.innerHTML = `
-            <span class="btn-icon">🔍</span>
-            Filter
-        `;
-        
-        filterToggle.addEventListener('click', () => {
-            this.toggleFiltersPanel();
-        });
-        
-        // Create search input
-        const sessionsSearchInput = document.createElement('input');
-        sessionsSearchInput.type = 'text';
-        sessionsSearchInput.placeholder = 'Search observations...';
-        sessionsSearchInput.className = 'search-input';
-        sessionsSearchInput.style.cssText = `
-            padding: var(--space-3) var(--space-4);
-            background: var(--bg-surface);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
-            font-size: 14px;
-            width: 200px;
-        `;
-        
-        sessionsSearchInput.addEventListener('input', (e) => {
-            this.searchSessions(e.target.value);
-        });
-        
-        sessionsHeader.appendChild(filterToggle);
-        sessionsHeader.appendChild(sessionsSearchInput);
-
-        // Create search input for groups tab
-        const groupsHeader = document.querySelector('#groupsTab .section-header');
-        if (groupsHeader) {
-            const groupsSearchInput = document.createElement('input');
-            groupsSearchInput.type = 'text';
-            groupsSearchInput.placeholder = 'Search school groups...';
-            groupsSearchInput.className = 'search-input';
-            groupsSearchInput.style.cssText = `
-                padding: var(--space-3) var(--space-4);
-                background: var(--bg-surface);
-                border: 1px solid var(--border-primary);
-                border-radius: var(--radius-md);
-                color: var(--text-primary);
-                font-size: 14px;
-                width: 200px;
-            `;
-            
-            groupsSearchInput.addEventListener('input', (e) => {
-                this.searchGroups(e.target.value);
+    setupBulkOperations() {
+        // Bulk edit button
+        const bulkEditBtn = document.getElementById('bulkEditBtn');
+        if (bulkEditBtn) {
+            bulkEditBtn.addEventListener('click', () => {
+                this.handleBulkEdit();
             });
-            
-            groupsHeader.appendChild(groupsSearchInput);
         }
 
-        // Setup filters panel
-        this.setupFiltersPanel();
+        // Bulk delete button
+        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.addEventListener('click', () => {
+                this.handleBulkDelete();
+            });
+        }
+
+        // Cancel selection button
+        const cancelSelection = document.getElementById('cancelSelection');
+        if (cancelSelection) {
+            cancelSelection.addEventListener('click', () => {
+                this.deselectAllSessions();
+            });
+        }
     }
 
-    setupFiltersPanel() {
-        const sessionsTab = document.getElementById('sessionsTab');
-        
-        if (!sessionsTab) {
-            console.error('Sessions tab not found');
-            return;
+    setupGroupsBulkOperations() {
+        // Groups bulk edit button
+        const groupsBulkEditBtn = document.getElementById('groupsBulkEditBtn');
+        if (groupsBulkEditBtn) {
+            groupsBulkEditBtn.addEventListener('click', () => {
+                this.handleGroupsBulkEdit();
+            });
         }
 
-        // Create filters panel
-        const filtersPanel = document.createElement('div');
-        filtersPanel.id = 'filtersPanel';
-        filtersPanel.className = 'filters-panel';
-        filtersPanel.style.cssText = `
-            background: var(--bg-surface);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-lg);
-            padding: var(--space-4);
-            margin-bottom: var(--space-4);
-            display: none;
-        `;
-
-        filtersPanel.innerHTML = `
-            <div class="filters-header">
-                <h4>Filter Observations</h4>
-            </div>
-            <div class="filters-grid">
-                <div class="filter-group">
-                    <label class="filter-label">School</label>
-                    <select id="filterSchool" class="filter-input">
-                        <option value="all">All Schools</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">Campus</label>
-                    <select id="filterCampus" class="filter-input">
-                        <option value="all">All Campuses</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">Status</label>
-                    <select id="filterStatus" class="filter-input">
-                        <option value="all">All Status</option>
-                        <option value="draft">Draft</option>
-                        <option value="completed">Completed</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">Progress</label>
-                    <select id="filterProgress" class="filter-input">
-                        <option value="all">All Progress</option>
-                        <option value="not-started">Not Started</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="complete">Complete</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">Start Date</label>
-                    <input type="date" id="filterStartDate" class="filter-input">
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">End Date</label>
-                    <input type="date" id="filterEndDate" class="filter-input">
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">Sort By</label>
-                    <select id="filterSortBy" class="filter-input">
-                        <option value="date">Date Created</option>
-                        <option value="teacher">Teacher Name</option>
-                        <option value="school">School</option>
-                        <option value="progress">Progress</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label class="filter-label">Order</label>
-                    <select id="filterSortOrder" class="filter-input">
-                        <option value="desc">Newest First</option>
-                        <option value="asc">Oldest First</option>
-                    </select>
-                </div>
-            </div>
-            <div class="filters-actions">
-                <button id="applyFilters" class="btn btn-primary">Apply Filters</button>
-                <button id="clearFilters" class="btn btn-ghost">Clear All</button>
-            </div>
-        `;
-
-        // Insert filters panel before sessions container
-        const sessionsContainer = document.getElementById('sessionsContainer');
-        if (sessionsContainer) {
-            sessionsTab.insertBefore(filtersPanel, sessionsContainer);
-        } else {
-            sessionsTab.appendChild(filtersPanel);
+        // Groups bulk delete button
+        const groupsBulkDeleteBtn = document.getElementById('groupsBulkDeleteBtn');
+        if (groupsBulkDeleteBtn) {
+            groupsBulkDeleteBtn.addEventListener('click', () => {
+                this.handleGroupsBulkDelete();
+            });
         }
+
+        // Groups cancel selection button
+        const groupsCancelSelection = document.getElementById('groupsCancelSelection');
+        if (groupsCancelSelection) {
+            groupsCancelSelection.addEventListener('click', () => {
+                this.deselectAllGroups();
+            });
+        }
+    }
+
+    setupSortingControls() {
+        const groupBySelect = document.getElementById('groupBySelect');
+        const sortBySelect = document.getElementById('sortBySelect');
+
+        if (groupBySelect) {
+            groupBySelect.addEventListener('change', (e) => {
+                this.applySorting();
+            });
+        }
+
+        if (sortBySelect) {
+            sortBySelect.addEventListener('change', (e) => {
+                this.applySorting();
+            });
+        }
+    }
+
+    applySorting() {
+        const groupBySelect = document.getElementById('groupBySelect');
+        const sortBySelect = document.getElementById('sortBySelect');
+
+        const sortOptions = {
+            groupBy: groupBySelect ? groupBySelect.value : 'none',
+            sortBy: 'date', // default
+            sortOrder: 'desc' // default
+        };
+
+        if (sortBySelect) {
+            const [sortBy, sortOrder] = sortBySelect.value.split('-');
+            sortOptions.sortBy = sortBy;
+            sortOptions.sortOrder = sortOrder;
+        }
+
+        this.loadSessionsList(sortOptions);
+    }
+
+    handleBulkEdit() {
+        const selectedSessions = this.sessionManager.getSelectedSessions();
+        if (selectedSessions.length === 1) {
+            // Edit single session
+            this.editSession(selectedSessions[0].id);
+        }
+    }
+
+    handleBulkDelete() {
+        const selectedSessions = this.sessionManager.getSelectedSessions();
+        if (selectedSessions.length > 0) {
+            const sessionText = selectedSessions.length === 1 ? 
+                `"${selectedSessions[0].teacher}"` : 
+                `${selectedSessions.length} observations`;
+
+            this.showConfirmation(
+                'Delete Observations',
+                `Are you sure you want to delete ${sessionText}? They will be moved to trash.`,
+                'bulkDeleteSessions'
+            );
+        }
+    }
+
+    handleGroupsBulkEdit() {
+        const selectedGroups = this.groupsManager.getSelectedGroups();
+        if (selectedGroups.length === 1) {
+            // Edit single group
+            this.editGroup(selectedGroups[0].id);
+        }
+    }
+
+    handleGroupsBulkDelete() {
+        const selectedGroups = this.groupsManager.getSelectedGroups();
+        if (selectedGroups.length > 0) {
+            const groupText = selectedGroups.length === 1 ? 
+                `"${selectedGroups[0].schoolName}"` : 
+                `${selectedGroups.length} school groups`;
+
+            this.showConfirmation(
+                'Delete School Groups',
+                `Are you sure you want to delete ${groupText}? They will be moved to trash.`,
+                'bulkDeleteGroups'
+            );
+        }
+    }
+
+    deselectAllSessions() {
+        this.sessionManager.deselectAllSessions();
+    }
+
+    deselectAllGroups() {
+        this.groupsManager.deselectAllGroups();
     }
 
     // Dashboard and Tab Management
@@ -569,40 +549,39 @@ class App {
         }
     }
 
-    // FIX 4: Campus dropdown in edit observation
     editSession(sessionId) {
-    const session = this.sessionManager.getSessionForEdit(sessionId);
-    if (session) {
-        this.editingSessionId = sessionId;
-        
-        // Populate school dropdowns first
-        this.populateSchoolDropdowns();
-        
-        // Set form values
-        document.getElementById('editSchoolSelect').value = session.school || '';
-        document.getElementById('editTeacher').value = session.teacher || '';
-        document.getElementById('editDate').value = session.date || '';
-        document.getElementById('editUnit').value = session.unit || '';
-        document.getElementById('editLesson').value = session.lesson || '';
-        
-        // FIX: Wait for DOM to update, then populate campuses
-        setTimeout(() => {
-            if (session.school) {
-                this.handleSchoolSelection('editSchoolSelect', session.school);
-                
-                // Set campus after campuses are loaded
-                setTimeout(() => {
-                    const campusSelect = document.getElementById('editCampus');
-                    if (campusSelect) {
-                        campusSelect.value = session.campus || '';
-                    }
-                }, 150);
-            }
-        }, 100);
-        
-        document.getElementById('editSessionModal').style.display = 'flex';
+        const session = this.sessionManager.getSessionForEdit(sessionId);
+        if (session) {
+            this.editingSessionId = sessionId;
+            
+            // Populate school dropdowns first
+            this.populateSchoolDropdowns();
+            
+            // Set form values
+            document.getElementById('editSchoolSelect').value = session.school || '';
+            document.getElementById('editTeacher').value = session.teacher || '';
+            document.getElementById('editDate').value = session.date || '';
+            document.getElementById('editUnit').value = session.unit || '';
+            document.getElementById('editLesson').value = session.lesson || '';
+            
+            // Wait for DOM to update, then populate campuses
+            setTimeout(() => {
+                if (session.school) {
+                    this.handleSchoolSelection('editSchoolSelect', session.school);
+                    
+                    // Set campus after campuses are loaded
+                    setTimeout(() => {
+                        const campusSelect = document.getElementById('editCampus');
+                        if (campusSelect) {
+                            campusSelect.value = session.campus || '';
+                        }
+                    }, 150);
+                }
+            }, 100);
+            
+            document.getElementById('editSessionModal').style.display = 'flex';
+        }
     }
-}
 
     updateSession(sessionId) {
         const form = document.getElementById('editSessionForm');
@@ -629,6 +608,9 @@ class App {
             this.hideEditSessionModal();
             this.loadSessionsList();
             this.showNotification('Observation session updated');
+            
+            // FIXED: Clear selection after edit
+            this.deselectAllSessions();
         }
     }
 
@@ -654,63 +636,146 @@ class App {
     }
 
     hideNewGroupModal() {
-        document.getElementById('newGroupModal').style.display = 'none';
+    document.getElementById('newGroupModal').style.display = 'none';
+    this.editingGroupId = null;
+    
+    // Reset modal title
+    const modalTitle = document.querySelector('#newGroupModal .modal-title');
+    if (modalTitle) {
+        modalTitle.textContent = 'Create School Group';
     }
+    
+    // FIXED: Reset submit button text
+    const submitButton = document.querySelector('#newGroupModal .btn-primary');
+    if (submitButton) {
+        submitButton.textContent = 'Create Group';
+    }
+}
 
     createNewGroup() {
-        const form = document.getElementById('newGroupForm');
-        const formData = new FormData(form);
-        
-        const group = this.groupsManager.createGroup(
-            formData.get('groupName'),
-            formData.get('adminName'),
-            formData.get('adminPhone'),
-            formData.get('schoolAddress'),
-            formData.get('campusGroup')
-        );
-        
-        if (group) {
-            this.hideNewGroupModal();
-            this.loadGroupsList();
-            this.showNotification('New school group created');
-        }
+    const form = document.getElementById('newGroupForm');
+    
+    // FIXED: Get values directly from form elements
+    const schoolNameInput = document.getElementById('groupName');
+    const adminNameInput = document.getElementById('adminName');
+    const adminPhoneInput = document.getElementById('adminPhone');
+    const schoolAddressInput = document.getElementById('schoolAddress');
+    const campusInput = document.getElementById('campusGroup');
+    
+    const schoolName = schoolNameInput ? schoolNameInput.value.trim() : '';
+    const adminName = adminNameInput ? adminNameInput.value.trim() : '';
+    const adminPhone = adminPhoneInput ? adminPhoneInput.value.trim() : '';
+    const schoolAddress = schoolAddressInput ? schoolAddressInput.value.trim() : '';
+    const campus = campusInput ? campusInput.value.trim() : '';
+    
+    console.log('=== DEBUG: Create Group Form Data ===');
+    console.log('School Name:', schoolName, 'Length:', schoolName.length);
+    console.log('Admin Name:', adminName, 'Length:', adminName.length);
+    
+    // FIXED: Same validation as update
+    if (!schoolName) {
+        this.showNotification('School name is required', 'error');
+        schoolNameInput?.focus();
+        return;
     }
+    
+    if (!adminName) {
+        this.showNotification('Admin name is required', 'error');
+        adminNameInput?.focus();
+        return;
+    }
+    
+    const group = this.groupsManager.createGroup(
+        schoolName,
+        adminName,
+        adminPhone,
+        schoolAddress,
+        campus
+    );
+    
+    if (group) {
+        this.hideNewGroupModal();
+        this.loadGroupsList();
+        this.showNotification('New school group created');
+    }
+}
 
     updateGroup(groupId) {
-        const form = document.getElementById('newGroupForm');
-        const formData = new FormData(form);
-        
-        const updates = {
-            schoolName: formData.get('groupName'),
-            adminName: formData.get('adminName'),
-            adminPhone: formData.get('adminPhone'),
-            schoolAddress: formData.get('schoolAddress'),
-            campus: formData.get('campusGroup')
-        };
-        
-        const updatedGroup = this.groupsManager.updateGroup(groupId, updates);
-        if (updatedGroup) {
-            this.hideNewGroupModal();
-            this.loadGroupsList();
-            this.showNotification('School group updated');
-        }
+    const form = document.getElementById('newGroupForm');
+    const formData = new FormData(form);
+    
+    // FIXED: Get values directly from form elements for debugging
+    const schoolNameInput = document.getElementById('groupName');
+    const adminNameInput = document.getElementById('adminName');
+    const adminPhoneInput = document.getElementById('adminPhone');
+    const schoolAddressInput = document.getElementById('schoolAddress');
+    const campusInput = document.getElementById('campusGroup');
+    
+    const updates = {
+        schoolName: schoolNameInput ? schoolNameInput.value.trim() : '',
+        adminName: adminNameInput ? adminNameInput.value.trim() : '',
+        adminPhone: adminPhoneInput ? adminPhoneInput.value.trim() : '',
+        schoolAddress: schoolAddressInput ? schoolAddressInput.value.trim() : '',
+        campus: campusInput ? campusInput.value.trim() : ''
+    };
+    
+    console.log('=== DEBUG: Update Group Form Data ===');
+    console.log('School Name:', updates.schoolName, 'Length:', updates.schoolName.length);
+    console.log('Admin Name:', updates.adminName, 'Length:', updates.adminName.length);
+    console.log('Form element values - School:', schoolNameInput?.value, 'Admin:', adminNameInput?.value);
+    console.log('Full updates object:', updates);
+    
+    // FIXED: More specific validation
+    if (!updates.schoolName) {
+        this.showNotification('School name is required', 'error');
+        schoolNameInput?.focus();
+        return;
     }
+    
+    if (!updates.adminName) {
+        this.showNotification('Admin name is required', 'error');
+        adminNameInput?.focus();
+        return;
+    }
+    
+    const updatedGroup = this.groupsManager.updateGroup(groupId, updates);
+    if (updatedGroup) {
+        this.hideNewGroupModal();
+        this.loadGroupsList();
+        this.showNotification('School group updated');
+        this.deselectAllGroups();
+    } else {
+        this.showNotification('Failed to update school group', 'error');
+    }
+}
 
     editGroup(groupId) {
-        const group = this.groupsManager.getGroup(groupId);
-        if (group) {
-            this.editingGroupId = groupId;
-            
-            // Populate form
-            document.getElementById('groupName').value = group.schoolName;
-            document.getElementById('adminName').value = group.adminName;
-            document.getElementById('adminPhone').value = group.adminPhone || '';
-            document.getElementById('schoolAddress').value = group.schoolAddress || '';
-            document.getElementById('campusGroup').value = group.campus || '';
-            
-            document.getElementById('newGroupModal').style.display = 'flex';
+    const group = this.groupsManager.getGroup(groupId);
+    if (group) {
+        this.editingGroupId = groupId;
+        
+        // Update modal title
+        const modalTitle = document.querySelector('#newGroupModal .modal-title');
+        if (modalTitle) {
+            modalTitle.textContent = 'Edit School Group';
         }
+        
+        // FIXED: Update submit button text
+        const submitButton = document.querySelector('#newGroupModal .btn-primary');
+        if (submitButton) {
+            submitButton.textContent = 'Update Group';
+        }
+        
+        // Populate form
+        document.getElementById('groupName').value = group.schoolName || '';
+        document.getElementById('adminName').value = group.adminName || '';
+        document.getElementById('adminPhone').value = group.adminPhone || '';
+        document.getElementById('schoolAddress').value = group.schoolAddress || '';
+        document.getElementById('campusGroup').value = group.campus || '';
+        
+        document.getElementById('newGroupModal').style.display = 'flex';
     }
+}
 
     editCurrentGroup() {
         if (this.currentGroupId) {
@@ -753,7 +818,7 @@ class App {
             document.getElementById('groupViewSubtitle').textContent = 
                 `${group.schoolName}${group.campus ? ` • ${group.campus}` : ''}`;
             
-            // FIX: Setup back button
+            // Setup back button
             this.setupGroupViewBackButton();
             
             // Load group sessions
@@ -803,8 +868,7 @@ class App {
         const schools = this.groupsManager.getSchoolsForDropdown();
         const schoolSelects = [
             document.getElementById('schoolSelect'),
-            document.getElementById('editSchoolSelect'),
-            document.getElementById('filterSchool')
+            document.getElementById('editSchoolSelect')
         ];
         
         schoolSelects.forEach(select => {
@@ -881,6 +945,12 @@ class App {
                 }
                 break;
                 
+            case 'bulkDeleteSessions':
+                const deletedCount = this.sessionManager.deleteSelectedSessions();
+                this.loadSessionsList();
+                this.showNotification(`${deletedCount} observation${deletedCount !== 1 ? 's' : ''} moved to trash`);
+                break;
+                
             case 'deleteGroup':
                 if (this.confirmedActionData) {
                     this.groupsManager.deleteGroup(this.confirmedActionData);
@@ -889,28 +959,51 @@ class App {
                 }
                 break;
                 
+            case 'bulkDeleteGroups':
+                const deletedGroupsCount = this.groupsManager.deleteSelectedGroups();
+                this.loadGroupsList();
+                this.showNotification(`${deletedGroupsCount} school group${deletedGroupsCount !== 1 ? 's' : ''} moved to trash`);
+                break;
+                
             case 'emptyTrash':
                 this.groupsManager.emptyTrash();
                 this.loadTrashItems();
                 this.showNotification('Trash emptied');
                 break;
+
+            // FIXED: Add permanent delete case
+            case 'permanentDelete':
+                if (this.confirmedActionData) {
+                    const { itemId, itemType } = this.confirmedActionData;
+                    const success = this.groupsManager.permanentlyDelete(itemId);
+                    if (success) {
+                        this.loadTrashItems();
+                        this.showNotification('Item permanently deleted');
+                    }
+                }
+                break;
         }
         
         this.hideConfirmationModal();
     }
-/*
-    // ADD THIS METHOD - Setup collapse button
-    setupCollapseButton() {
-        const collapseBtn = document.getElementById('collapseBtn');
-        if (collapseBtn) {
-            collapseBtn.addEventListener('click', () => {
-                this.toggleSidebar();
-            });
-        }
-    }
-*/
 
-    // Enhanced Features
+    setupSidebarToggle() {
+    const collapseBtn = document.getElementById('collapseBtn');
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+    
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', () => {
+            this.toggleSidebar();
+        });
+    }
+    
+    if (sidebarToggleBtn) {
+        sidebarToggleBtn.addEventListener('click', () => {
+            this.toggleSidebar();
+        });
+    }
+}
+
     toggleSidebar() {       
     console.log('toggleSidebar called');
     const sidebar = document.querySelector('.indicators-sidebar');
@@ -959,17 +1052,6 @@ class App {
     }, 300);
 }
 
-// Make sure to initialize the button as hidden
-/*initializeSidebarToggle() {
-    const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
-    if (sidebarToggleBtn) {
-        sidebarToggleBtn.style.display = 'none'; // Start hidden
-        sidebarToggleBtn.addEventListener('click', () => {
-            this.toggleSidebar();
-        });
-    }
-}*/
-
     updateIndicatorPerformanceDisplay() {
         const indicators = document.querySelectorAll('.indicator-item');
         indicators.forEach(indicator => {
@@ -1016,159 +1098,233 @@ class App {
         }
     }
 
-    // Filter System
-    toggleFiltersPanel() {
-        const filtersPanel = document.getElementById('filtersPanel');
-        if (!filtersPanel) return;
-        
-        const isVisible = filtersPanel.style.display === 'block';
-        
-        if (isVisible) {
-            filtersPanel.style.display = 'none';
-        } else {
-            filtersPanel.style.display = 'block';
-            this.populateFilterOptions();
-        }
-    }
-
-    populateFilterOptions() {
-        // Populate school dropdowns
-        this.populateSchoolDropdowns();
-        
-        const filterOptions = this.sessionManager.getFilterOptions();
-        
-        // Populate campus filter
-        const campusSelect = document.getElementById('filterCampus');
-        if (campusSelect) {
-            campusSelect.innerHTML = '<option value="all">All Campuses</option>';
-            filterOptions.campuses.forEach(campus => {
-                const option = document.createElement('option');
-                option.value = campus;
-                option.textContent = campus;
-                campusSelect.appendChild(option);
-            });
-        }
-    }
-
-    applyFilters() {
-        const filters = {
-            school: document.getElementById('filterSchool')?.value || 'all',
-            campus: document.getElementById('filterCampus')?.value || 'all',
-            status: document.getElementById('filterStatus')?.value || 'all',
-            progress: document.getElementById('filterProgress')?.value || 'all',
-            startDate: document.getElementById('filterStartDate')?.value || '',
-            endDate: document.getElementById('filterEndDate')?.value || '',
-            sortBy: document.getElementById('filterSortBy')?.value || 'date',
-            sortOrder: document.getElementById('filterSortOrder')?.value || 'desc'
-        };
-
-        // Remove empty filters
-        Object.keys(filters).forEach(key => {
-            if (!filters[key] || filters[key] === 'all') {
-                delete filters[key];
-            }
-        });
-
-        this.currentFilters = filters;
-        this.loadSessionsList();
-
-        // Show filter count badge
-        const filterCount = Object.keys(filters).length;
-        const toggleBtn = document.getElementById('toggleFilters');
-        if (toggleBtn) {
-            let badge = toggleBtn.querySelector('.filter-badge');
-            
-            if (filterCount > 0) {
-                if (!badge) {
-                    badge = document.createElement('span');
-                    badge.className = 'filter-badge';
-                    badge.style.cssText = `
-                        background: var(--accent-primary);
-                        color: white;
-                        border-radius: 50%;
-                        width: 16px;
-                        height: 16px;
-                        font-size: 10px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        position: absolute;
-                        top: -4px;
-                        right: -4px;
-                    `;
-                    toggleBtn.style.position = 'relative';
-                    toggleBtn.appendChild(badge);
-                }
-                badge.textContent = filterCount;
-            } else if (badge) {
-                badge.remove();
-            }
-        }
-
-        this.showNotification(`Applied ${filterCount} filter${filterCount !== 1 ? 's' : ''}`);
-    }
-
-    clearFilters() {
-        // Reset all filter inputs
-        const filterIds = ['filterSchool', 'filterCampus', 'filterStatus', 'filterProgress', 'filterStartDate', 'filterEndDate', 'filterSortBy', 'filterSortOrder'];
-        filterIds.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                if (element.type === 'select-one') {
-                    element.value = element.id === 'filterSortBy' ? 'date' : 
-                                  element.id === 'filterSortOrder' ? 'desc' : 'all';
-                } else if (element.type === 'date') {
-                    element.value = '';
-                }
-            }
-        });
-
-        this.currentFilters = {};
-        this.loadSessionsList();
-
-        // Remove filter badge
-        const toggleBtn = document.getElementById('toggleFilters');
-        if (toggleBtn) {
-            const badge = toggleBtn.querySelector('.filter-badge');
-            if (badge) {
-                badge.remove();
-            }
-        }
-
-        this.showNotification('Filters cleared');
-    }
-
     // Data Loading Methods
-    loadSessionsList() {
-        const container = document.getElementById('sessionsContainer');
-        const emptyState = document.getElementById('emptySessionsState');
-        
-        if (!container || !emptyState) return;
-        
-        this.sessionManager.renderSessionsList(
-            container,
+    loadSessionsList(sortOptions = {}) {
+    const container = document.getElementById('sessionsContainer');
+    const emptyState = document.getElementById('emptySessionsState');
+    
+    if (!container || !emptyState) return;
+    
+    console.log('Loading sessions list with sort options:', sortOptions);
+    
+    // Clear container first
+    container.innerHTML = '';
+    
+    let sessionsToRender = this.currentFilters && Object.keys(this.currentFilters).length > 0 ? 
+        this.sessionManager.filterSessions(this.currentFilters) : 
+        [...this.sessionManager.sessions];
+
+    // Apply sorting
+    sessionsToRender = this.sessionManager.sortSessions(sessionsToRender, sortOptions);
+
+    // Apply grouping
+    const groupedSessions = this.sessionManager.groupSessions(sessionsToRender, sortOptions.groupBy);
+
+    if (sessionsToRender.length === 0) {
+        console.log('No sessions to display');
+        if (emptyState) {
+            emptyState.style.display = 'block';
+        }
+        container.style.display = 'none';
+        this.updateCounts();
+        return;
+    }
+
+    console.log(`Rendering ${sessionsToRender.length} sessions`);
+    
+    if (emptyState) {
+        emptyState.style.display = 'none';
+    }
+    container.style.display = 'block';
+
+    // Render grouped or ungrouped sessions
+    if (sortOptions.groupBy && sortOptions.groupBy !== 'none') {
+        this.sessionManager.renderGroupedSessions(
+            container, 
+            groupedSessions, 
             (sessionId) => this.loadSession(sessionId),
             (sessionId) => this.editSession(sessionId),
-            (sessionId) => this.deleteSession(sessionId),
-            this.currentFilters
+            (sessionId) => this.deleteSession(sessionId)
         );
-        this.updateCounts();
+    } else {
+        sessionsToRender.forEach(session => {
+            const sessionElement = this.sessionManager.createSessionElement(
+                session,
+                (sessionId) => this.loadSession(sessionId),
+                (sessionId) => this.editSession(sessionId),
+                (sessionId) => this.deleteSession(sessionId)
+            );
+            container.appendChild(sessionElement);
+        });
+    }
+    
+    this.updateCounts();
+}
+
+
+loadGroupsList() {
+    const container = document.getElementById('groupsContainer');
+    const emptyState = document.getElementById('emptyGroupsState');
+    
+    console.log('=== DEBUG: Loading Groups List ===');
+    console.log('Container exists:', !!container);
+    console.log('Empty state exists:', !!emptyState);
+    console.log('Groups count:', this.groupsManager.groups.length);
+    console.log('Groups data:', this.groupsManager.groups);
+    
+    if (!container) {
+        console.error('Groups container not found!');
+        return;
+    }
+    
+    // Clear container
+    container.innerHTML = '';
+    
+    if (this.groupsManager.groups.length === 0) {
+        console.log('No groups found, showing empty state');
+        if (emptyState) {
+            emptyState.style.display = 'block';
+        }
+        container.style.display = 'none';
+        
+        // Try to force create schools
+        console.log('Attempting to create schools...');
+        this.groupsManager.preCreateSchools();
+        this.groupsManager.saveGroups();
+        
+        // Reload after creation
+        if (this.groupsManager.groups.length > 0) {
+            console.log('Schools created, reloading list...');
+            this.loadGroupsList();
+        }
+        return;
+    }
+    
+    console.log(`Rendering ${this.groupsManager.groups.length} groups`);
+    
+    if (emptyState) {
+        emptyState.style.display = 'none';
+    }
+    container.style.display = 'grid';
+    
+    // FIXED: Manually render groups if the method isn't working
+    this.renderGroupsManually(container);
+    
+    this.updateCounts();
+}
+
+// Add this method to manually render groups
+renderGroupsManually(container) {
+    console.log('Manually rendering groups...');
+    
+    // FIXED: Handle null/undefined values in sort
+    const sortedGroups = this.groupsManager.groups.sort((a, b) => {
+        const schoolA = a.schoolName || '';
+        const schoolB = b.schoolName || '';
+        const campusA = a.campus || '';
+        const campusB = b.campus || '';
+        
+        const schoolCompare = schoolA.localeCompare(schoolB);
+        if (schoolCompare !== 0) return schoolCompare;
+        return campusA.localeCompare(campusB);
+    });
+
+    sortedGroups.forEach(group => {
+        const groupElement = this.createGroupElement(group);
+        container.appendChild(groupElement);
+    });
+    
+    console.log(`Successfully rendered ${sortedGroups.length} groups`);
+}
+
+// Add this method to create group elements
+createGroupElement(group) {
+    const groupElement = document.createElement('div');
+    groupElement.className = 'group-item';
+    groupElement.dataset.id = group.id;
+
+    groupElement.innerHTML = `
+        <div class="group-item-checkbox">
+            <input type="checkbox" class="group-checkbox" data-group-id="${group.id}">
+        </div>
+        <div class="group-item-content">
+            <div class="group-header">
+                <div>
+                    <div class="group-title">${group.schoolName}</div>
+                    ${group.campus ? `<div class="group-campus">${group.campus}</div>` : ''}
+                    <div class="group-admin">Admin: ${group.adminName}</div>
+                </div>
+                <div class="group-stats">
+                    <span>${group.sessionCount || 0} sessions</span>
+                </div>
+            </div>
+            <div class="group-details">
+                ${group.adminPhone ? `
+                    <div class="group-phone">
+                        <span class="icon">📞</span>
+                        ${group.adminPhone}
+                    </div>
+                ` : ''}
+                ${group.schoolAddress ? `
+                    <div class="group-address">
+                        <span class="icon">📍</span>
+                        ${group.schoolAddress}
+                    </div>
+                ` : ''}
+            </div>
+            <div class="group-actions">
+                <button class="btn btn-ghost btn-small group-view-btn" data-id="${group.id}">
+                    <span class="btn-icon">👁️</span>
+                    View
+                </button>
+                <button class="btn btn-ghost btn-small group-edit-btn" data-id="${group.id}">
+                    <span class="btn-icon">✏️</span>
+                    Edit
+                </button>
+                <button class="btn btn-danger btn-small group-delete-btn" data-id="${group.id}">
+                    <span class="btn-icon">🗑️</span>
+                    Delete
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Add event listeners
+    const viewBtn = groupElement.querySelector('.group-view-btn');
+    const editBtn = groupElement.querySelector('.group-edit-btn');
+    const deleteBtn = groupElement.querySelector('.group-delete-btn');
+    
+    if (viewBtn) {
+        viewBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showGroupView(group.id);
+        });
+    }
+    
+    if (editBtn) {
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.editGroup(group.id);
+        });
     }
 
-    loadGroupsList() {
-        const container = document.getElementById('groupsContainer');
-        const emptyState = document.getElementById('emptyGroupsState');
-        
-        if (!container || !emptyState) return;
-        
-        this.groupsManager.renderGroupsList(
-            container,
-            (groupId) => this.showGroupView(groupId),
-            (groupId) => this.editGroup(groupId),
-            (groupId) => this.deleteGroup(groupId)
-        );
-        this.updateCounts();
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.deleteGroup(group.id);
+        });
     }
+
+    // Checkbox event
+    const checkbox = groupElement.querySelector('.group-checkbox');
+    checkbox.addEventListener('change', (e) => {
+        e.stopPropagation();
+        this.groupsManager.toggleGroupSelection(group.id, checkbox.checked);
+        groupElement.classList.toggle('selected', checkbox.checked);
+    });
+
+    return groupElement;
+}
 
     loadTrashItems() {
         const container = document.getElementById('trashContainer');
@@ -1192,6 +1348,7 @@ class App {
             container.appendChild(groupsContainer);
         }
         
+        // FIXED: Properly render trash items
         this.groupsManager.renderTrashList(
             sessionsContainer,
             groupsContainer,
@@ -1201,126 +1358,68 @@ class App {
         this.updateCounts();
     }
 
-    // Search Functionality
-    searchSessions(query) {
-        const container = document.getElementById('sessionsContainer');
-        const emptyState = document.getElementById('emptySessionsState');
-        
-        if (!container || !emptyState) return;
-        
-        if (!query.trim()) {
-            this.loadSessionsList();
-            return;
-        }
-        
-        const filteredSessions = this.sessionManager.searchSessions(query);
-        this.renderFilteredSessions(filteredSessions, container, emptyState);
-    }
-
-    searchGroups(query) {
-        const container = document.getElementById('groupsContainer');
-        const emptyState = document.getElementById('emptyGroupsState');
-        
-        if (!container || !emptyState) return;
-        
-        if (!query.trim()) {
-            this.loadGroupsList();
-            return;
-        }
-        
-        const filteredGroups = this.groupsManager.searchGroups(query);
-        this.renderFilteredGroups(filteredGroups, container, emptyState);
-    }
-
-    renderFilteredSessions(sessions, container, emptyState) {
-        container.innerHTML = '';
-        
-        if (sessions.length === 0) {
-            emptyState.style.display = 'block';
-            container.style.display = 'none';
-            return;
-        }
-        
-        emptyState.style.display = 'none';
-        container.style.display = 'grid';
-
-        sessions.forEach(session => {
-            const sessionElement = this.sessionManager.createSessionElement(
-                session,
-                (sessionId) => {
-                    this.loadSession(sessionId);
-                },
-                (sessionId) => this.editSession(sessionId),
-                (sessionId) => this.deleteSession(sessionId)
-            );
-            container.appendChild(sessionElement);
-        });
-    }
-
-    renderFilteredGroups(groups, container, emptyState) {
-        container.innerHTML = '';
-        
-        if (groups.length === 0) {
-            emptyState.style.display = 'block';
-            container.style.display = 'none';
-            return;
-        }
-        
-        emptyState.style.display = 'none';
-        container.style.display = 'grid';
-
-        groups.forEach(group => {
-            const groupElement = this.groupsManager.createGroupElement(
-                group,
-                (groupId) => this.showGroupView(groupId),
-                (groupId) => this.editGroup(groupId),
-                (groupId) => this.deleteGroup(groupId)
-            );
-            container.appendChild(groupElement);
-        });
-    }
-
     // Enhanced session loading with performance data
     loadSession(sessionId) {
-        const session = this.sessionManager.loadSession(sessionId);
-        if (session) {
-            this.showNoteApp();
-            
-            // Update session info
-            const sessionInfo = document.getElementById('sessionInfo');
-            if (sessionInfo) {
-                sessionInfo.textContent = 
-                    `${session.school}${session.campus ? ` • ${session.campus}` : ''} • ${session.teacher} • Unit ${session.unit}`;
-            }
-            
-            // Render indicators list with performance data
-            const indicatorsList = document.getElementById('indicatorsList');
-            if (indicatorsList) {
-                this.indicatorsManager.renderIndicatorsList(
-                    indicatorsList,
-                    (indicator) => {
-                        this.selectIndicator(indicator);
-                    },
-                    this.sessionManager
-                );
-            }
-            
-            // Update performance display
-            this.updateIndicatorPerformanceDisplay();
-            
-            this.updateProgress();
-            this.showCanvasOverlay();
-            
-            this.updateStatus(`Session loaded for ${session.teacher}`);
+    const session = this.sessionManager.loadSession(sessionId);
+    if (session) {
+        this.showNoteApp();
+        
+        // Update session info
+        const sessionInfo = document.getElementById('sessionInfo');
+        if (sessionInfo) {
+            sessionInfo.textContent = 
+                `${session.school}${session.campus ? ` • ${session.campus}` : ''} • ${session.teacher} • Unit ${session.unit}`;
         }
+        
+        // Render indicators list with performance data
+        const indicatorsList = document.getElementById('indicatorsList');
+        if (indicatorsList) {
+            this.indicatorsManager.renderIndicatorsList(
+                indicatorsList,
+                (indicator) => {
+                    this.selectIndicator(indicator);
+                },
+                this.sessionManager // Pass sessionManager to indicators
+            );
+        }
+        
+        // Debug: Check initial state of all indicators in this session
+        console.log('=== DEBUG: Session Indicator States ===');
+        console.log('Session ID:', sessionId);
+        console.log('Total indicators in session:', Object.keys(session.indicators || {}).length);
+        
+        Object.keys(session.indicators || {}).forEach(indicatorId => {
+            this.debugIndicatorState(indicatorId);
+        });
+        
+        // Update performance display
+        this.updateIndicatorPerformanceDisplay();
+        
+        this.updateProgress();
+        this.showCanvasOverlay();
+        
+        this.updateStatus(`Session loaded for ${session.teacher}`);
+    } else {
+        console.error('Failed to load session:', sessionId);
     }
+}
 
-    // FIX 2: Indicator selection - No automatic performance marking or coloring
-    // FIX 2: Indicator selection - No automatic coloring
+// Add this debug method to your App class
+debugIndicatorState(indicatorId) {
+    const notes = this.sessionManager.getIndicatorNotes(indicatorId);
+    console.log(`Indicator ${indicatorId}:`, {
+        performanceType: notes ? notes.performanceType : 'null',
+        hasDrawing: notes && notes.drawingData ? notes.drawingData.length > 0 : false,
+        hasAutoComment: notes ? notes.autoComment : false,
+        drawingDataLength: notes && notes.drawingData ? notes.drawingData.length : 0
+    });
+}
+
+    // FIXED: Indicator selection - No automatic performance marking
     selectIndicator(indicator) {
         console.log('Selecting indicator:', indicator.id);
         
-        // Just set active indicator, no coloring
+        // Just set active indicator, no automatic marking
         this.indicatorsManager.setActiveIndicator(indicator.id);
         
         // Load existing drawing
@@ -1373,7 +1472,7 @@ class App {
     const progressFill = document.getElementById('progressFill');
     
     const stats = this.indicatorsManager.getPerformanceStats(this.sessionManager);
-    const completed = stats.total; // Now only non-empty
+    const completed = stats.total; // Now counts actual content, not performance types
     
     progressCount.textContent = `${completed}/18`;
     progressFill.style.width = `${(completed / 18) * 100}%`;
@@ -1435,24 +1534,6 @@ class App {
         }
     }
 
-    setupSidebarToggle() {
-    const collapseBtn = document.getElementById('collapseBtn');
-    const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn'); // Note: changed ID
-    
-    if (collapseBtn) {
-        collapseBtn.addEventListener('click', () => {
-            this.toggleSidebar();
-        });
-    }
-    
-    if (sidebarToggleBtn) {
-        sidebarToggleBtn.addEventListener('click', () => {
-            this.toggleSidebar();
-        });
-    }
-}
-
-
     // Notification System
     showNotification(message, type = 'success') {
         // Enhanced notification that works with safe areas
@@ -1494,21 +1575,23 @@ class App {
         }, 3000);
     }
 
-    // Stub methods for future implementation
+    // FIXED: Restore item functionality
     restoreItem(itemId, itemType) {
         const result = this.groupsManager.restoreFromTrash(itemId);
         if (result) {
             if (result.type === 'session') {
                 this.sessionManager.restoreSession(result.data);
                 this.loadSessionsList();
+                this.showNotification('Observation restored from trash');
             } else if (result.type === 'group') {
                 this.loadGroupsList();
+                this.showNotification('School group restored from trash');
             }
             this.loadTrashItems();
-            this.showNotification('Item restored from trash');
         }
     }
 
+    // FIXED: Permanent delete functionality
     permanentlyDeleteItem(itemId, itemType) {
         this.showConfirmation(
             'Permanently Delete',
@@ -1525,5 +1608,3 @@ document.addEventListener('DOMContentLoaded', () => {
     new App();
     console.log('🚀 Teacher Notes App Started with Enhanced Features!');
 });
-
-

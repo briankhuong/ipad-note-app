@@ -167,8 +167,18 @@ body {
 .section-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: var(--space-4);
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.section-title-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 200px;
 }
 
 .section-title {
@@ -177,9 +187,12 @@ body {
   color: var(--text-primary);
 }
 
-.section-actions {
+.section-controls {
   display: flex;
+  align-items: center;
   gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .session-count, .group-count, .trash-count {
@@ -191,6 +204,59 @@ body {
   border: 1px solid var(--border-primary);
 }
 
+/* Bulk Actions Toolbar */
+.bulk-actions-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-lg);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.selected-count {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-right: var(--space-2);
+}
+
+/* Sorting Controls */
+.sorting-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sort-select {
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  min-width: 140px;
+}
+
+.sort-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
 /* Cards Grid */
 .sessions-grid, .groups-grid {
   display: grid;
@@ -198,7 +264,8 @@ body {
   gap: var(--space-4);
 }
 
-.session-card, .group-item {
+/* Session Cards with Checkboxes */
+.session-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
@@ -207,11 +274,48 @@ body {
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  display: flex;
+  gap: var(--space-3);
 }
 
-.session-card:hover, .group-item:hover {
+.session-card:hover {
   border-color: var(--accent-primary);
   transform: translateY(-2px);
+}
+
+.session-card.selected {
+  border-color: var(--accent-primary);
+  background: rgba(121, 40, 202, 0.05);
+}
+
+.session-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-card-checkbox {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.session-card-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.session-card-checkbox input[type="checkbox"]:checked {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.session-card-checkbox input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(121, 40, 202, 0.2);
 }
 
 .session-card h3, .group-title {
@@ -225,6 +329,7 @@ body {
   font-size: 14px;
   color: var(--text-secondary);
   margin-bottom: var(--space-2);
+  line-height: 1.4;
 }
 
 .session-stats, .group-stats {
@@ -243,6 +348,28 @@ body {
   border-radius: var(--radius-sm);
   font-size: 10px;
   font-weight: 600;
+}
+
+/* Group Headers for Grouped Sessions */
+.session-group-header {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.session-group-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
 }
 
 /* Progress bars */
@@ -1148,70 +1275,64 @@ body {
   color: var(--text-tertiary);
 }
 
-/* Swipe Containers */
-.swipe-container {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
-}
-
-.swipe-content {
+/* Filters Panel */
+.filters-panel {
   background: var(--bg-surface);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  z-index: 2;
+  margin-bottom: var(--space-4);
+  animation: slideDown 0.2s ease;
 }
 
-.swipe-actions {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  transform: translateX(100%);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 1;
+.filters-header {
+  margin-bottom: var(--space-4);
 }
 
-/* Enhanced Session Cards with Railway Icons */
-.swipe-action {
+.filters-header h4 {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.filter-group {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 var(--space-4);
-  border: none;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 80px;
+  flex-direction: column;
   gap: var(--space-2);
 }
 
-.swipe-action.edit {
-  background: var(--accent-primary);
+.filter-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
-.swipe-action.delete {
-  background: var(--error);
+.filter-input {
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 14px;
 }
 
-.swipe-action:hover {
-  filter: brightness(1.1);
+.filter-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
 }
 
-/* Railway Icons */
-.icon-edit::before { content: "✎"; }
-.icon-delete::before { content: "🗑"; }
-.icon-pen::before { content: "🖊"; }
-.icon-eraser::before { content: "🧹"; }
-.icon-collapse::before { content: "◀"; }
-.icon-expand::before { content: "▶"; }
-.icon-comments::before { content: "💬"; }
+.filters-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
 
 /* Trash Items */
 .trash-item {
@@ -1267,53 +1388,6 @@ body {
   color: var(--text-tertiary);
 }
 
-/* Filters Panel */
-.filters-panel {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.filters-header {
-  margin-bottom: var(--space-4);
-}
-
-.filters-header h4 {
-  color: var(--text-primary);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.filters-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.filter-input {
-  padding: var(--space-2) var(--space-3);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.filters-actions {
-  display: flex;
-  gap: var(--space-3);
-  justify-content: flex-end;
-}
-
 /* Remove comments palette styles */
 .comments-palette,
 .comments-toggle,
@@ -1323,6 +1397,14 @@ body {
 
 /* Remove old performance toggle styles */
 .performance-toggle {
+  display: none;
+}
+
+/* Remove swipe-related styles */
+.swipe-container,
+.swipe-content,
+.swipe-actions,
+.swipe-action {
   display: none;
 }
 
@@ -1371,6 +1453,32 @@ body {
     justify-content: space-between;
   }
   
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  
+  .section-controls {
+    justify-content: stretch;
+  }
+  
+  .bulk-actions-toolbar {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .sorting-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .sort-select {
+    flex: 1;
+    min-width: auto;
+  }
+  
   /* Mobile sidebar behavior */
   .indicators-sidebar:not(.collapsed) {
     position: absolute;
@@ -1400,6 +1508,15 @@ body {
   .group-view-actions {
     width: 100%;
     justify-content: space-between;
+  }
+  
+  .session-card {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  
+  .session-card-checkbox {
+    align-self: flex-start;
   }
   
   .indicator-controls {
@@ -1434,6 +1551,10 @@ body {
   .filter-label {
     text-align: center;
   }
+  
+  .filters-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1452,6 +1573,17 @@ body {
   
   .form-actions {
     flex-direction: column;
+  }
+  
+  .bulk-actions-toolbar {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .selected-count {
+    width: 100%;
+    text-align: center;
+    margin-bottom: var(--space-2);
   }
 }
 
@@ -1517,4 +1649,174 @@ body {
 #sidebar-toggle-btn.sidebar-toggle:hover {
   background: var(--bg-hover);
   left: 2px; /* Slight slide out on hover */
+}
+
+/* Add these styles to your existing main.css */
+
+/* Group Cards with Checkboxes */
+.group-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    gap: var(--space-3);
+}
+
+.group-item:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+}
+
+.group-item.selected {
+    border-color: var(--accent-primary);
+    background: rgba(121, 40, 202, 0.05);
+}
+
+.group-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.group-item-checkbox {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.group-item-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.group-item-checkbox input[type="checkbox"]:checked {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.group-item-checkbox input[type="checkbox"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(121, 40, 202, 0.2);
+}
+
+.group-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    flex-wrap: wrap;
+}
+
+/* Trash Items with Checkboxes */
+.trash-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-3);
+}
+
+.trash-item.selected {
+    border-color: var(--accent-primary);
+    background: rgba(121, 40, 202, 0.05);
+}
+
+.trash-item-checkbox {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.trash-item-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.trash-item-checkbox input[type="checkbox"]:checked {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.trash-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.trash-item-info {
+    margin-bottom: var(--space-2);
+}
+
+.trash-item-title {
+    font-weight: 600;
+    margin-bottom: var(--space-1);
+    font-size: 14px;
+}
+
+.trash-item-meta {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.trash-item-actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-shrink: 0;
+}
+/* Add to main.css - Tool Icons */
+.icon-pen::before {
+    content: "✏️";
+}
+
+.icon-eraser::before {
+    content: "🧽";
+}
+
+/* Ensure tool buttons are visible */
+.tool-btn {
+    background: none;
+    border: none;
+    padding: var(--space-2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    width: 40px;
+    height: 40px;
+}
+
+.tool-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.tool-btn.active {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.tool-icon {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
 }
